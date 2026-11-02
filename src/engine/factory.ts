@@ -27,8 +27,10 @@ function hasSAB(): boolean {
   }
 }
 
+// Both causes look the same from here: the page is not cross-origin isolated.
+// GitHub Pages (and any host that cannot send its own headers) is in this group.
 const NO_SAB =
-  "浏览器禁止了 SharedArrayBuffer（file:// 页面总是这样）—— 用 npm run play 起本地服务器就能多线程";
+  "这个页面不是跨源隔离的，浏览器因此禁用 SharedArrayBuffer —— 本地用 npm run play（会发 COOP/COEP），静态托管改不了响应头，只能单线程";
 
 export async function createSubstrate(o: CreateOptions): Promise<{ substrate: Substrate; info: string }> {
   const threads = Math.max(1, Math.min(8, o.threads ?? autoCores()));

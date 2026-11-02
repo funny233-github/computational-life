@@ -291,6 +291,23 @@ scripts/smoke.mjs        假 DOM 跑一遍打包产物：运行时错误、控�
 引擎里出现 `document`/`window`/`canvas` 就失败；界面里 `import "../engine/..."`
 只允许 `index`、`factory`、`substrate` 三个入口；界面里出现 `WebAssembly`/`evalTape` 也算越界。
 
+## 托管到 GitHub Pages
+
+仓库里带了 `.github/workflows/pages.yml`：推到 `master` 就自动构建 `dist/` 并发到 Pages。
+第一次要手动去 Settings → Pages → Source 选 **GitHub Actions**，之后每次推都是自动的。
+
+`vite.config.ts` 里的 `base: "./"` 让所有资源走相对路径，
+所以 `https://<用户名>.github.io/<仓库名>/` 这种子路径不用改任何东西，
+wasm 和 worker 也是同源直取（Pages 对 `.wasm` 给的是 `application/wasm`，不用配）。
+
+唯一的代价：**Pages 不能给静态文件加响应头**。页面因此不是跨源隔离的，
+`SharedArrayBuffer` 不可用，线程下拉会写明原因并退回单线程——
+功能全都在，只是慢 2–3 倍。想要回多线程只有两条路：
+
+* 换一个能写响应头的托管（Cloudflare Pages / Netlify 的 `_headers` 文件）；
+* 或者加一个 coi-serviceworker，用 Service Worker 把两个头"模拟"进页面（多一层间接）。
+
+
 ## 构建环境
 
 项目本身只有两个普通 devDependency（typescript / vite），
