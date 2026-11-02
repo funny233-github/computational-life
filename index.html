@@ -119,6 +119,14 @@
               </select>
             </div>
             <canvas id="lab"></canvas>
+            <canvas id="trace"></canvas>
+            <div class="row tight" id="lab-scrub">
+              <label class="auto">跑到第</label>
+              <input id="labstep" type="range" min="0" max="128" value="0" />
+              <output id="labstep-v">0</output>
+              <label class="auto">步</label>
+            </div>
+            <div class="legend" id="trace-legend"></div>
             <div class="insight" id="insight">
               <div class="ihead">
                 <span class="ibyte" id="i-byte">--</span>
@@ -131,14 +139,6 @@
               <p class="itext" id="i-text">—</p>
               <p class="ieffect" id="i-effect">—</p>
             </div>
-            <canvas id="trace"></canvas>
-            <div class="row tight" id="lab-scrub">
-              <label class="auto">跑到第</label>
-              <input id="labstep" type="range" min="0" max="128" value="0" />
-              <output id="labstep-v">0</output>
-              <label class="auto">步</label>
-            </div>
-            <div class="legend" id="trace-legend"></div>
             <pre id="lab-list" class="lablist">—</pre>
             <div id="lab-state" class="state">—</div>
             <div id="legend"></div>
