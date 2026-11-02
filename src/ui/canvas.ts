@@ -115,15 +115,11 @@ export function drawWindowCells(
 export class SoupCanvas {
   readonly el: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
-  private img: ImageData;
-  pixels: Uint32Array;
   /** the soup rasterised at one pixel per byte (or per cell); the browser scales it */
   private src: HTMLCanvasElement;
   private srcCtx: CanvasRenderingContext2D;
   private srcImg: ImageData;
   private srcPixels: Uint32Array;
-  /** integer factor the browser magnifies the bitmap by */
-  upscale = 1;
   /** bitmap pixels per byte */
   px = 1;
   camX = 0;
@@ -136,8 +132,6 @@ export class SoupCanvas {
     this.el = el;
     // desynchronized skips one compositor hop; zoom feels noticeably tighter
     this.ctx = el.getContext("2d", { desynchronized: true, alpha: false }) ?? el.getContext("2d")!;
-    this.img = this.ctx.createImageData(1, 1);
-    this.pixels = new Uint32Array(this.img.data.buffer);
     this.src = document.createElement("canvas");
     this.srcCtx = this.src.getContext("2d")!;
     this.srcImg = this.srcCtx.createImageData(1, 1);
@@ -198,7 +192,6 @@ export class SoupCanvas {
     this.h = h;
     this.side = side;
     const [cw, ch] = this.stage();
-    this.upscale = 1;
     this.el.width = Math.ceil(cw);
     this.el.height = Math.ceil(ch);
     this.el.style.width = this.el.width + "px";

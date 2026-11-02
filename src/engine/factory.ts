@@ -8,7 +8,7 @@ import { createZ80 } from "./z80sub.ts";
 import { BffSubstrate } from "./bffsub.ts";
 import type { Substrate } from "./substrate.ts";
 
-export interface CreateOptions {
+interface CreateOptions {
   kind: "z80" | "bff";
   w: number;
   h: number;

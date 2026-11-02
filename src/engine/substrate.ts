@@ -42,7 +42,6 @@ export interface Microscope {
   readonly pc: number;
   readonly h0: number;
   readonly h1: number;
-  readonly halted: boolean;
   readonly sp?: number;
   readonly writes?: number;
   /** 0 = not a scrubber */

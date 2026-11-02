@@ -22,13 +22,13 @@ export function shortAsm(b: number): string {
 }
 
 /** one-line label for a whole instruction, ED-prefixed forms included */
-export function asmText(b: number, next?: number): string {
+function asmText(b: number, next?: number): string {
   if (b === 0xed && next !== undefined) return `ED ${ED_NAME[next] ?? BYTE2ASM[next]}`;
   return BYTE2ASM[b];
 }
 
 /** instruction family, for the one-pixel-per-cell "code" view */
-export const Z80_CLASS = new Uint8Array(256);
+const Z80_CLASS = new Uint8Array(256);
 for (let i = 0; i < 256; i++) {
   const m = (BYTE2ASM[i] || "").split(" ")[0];
   if (i === 0x00) Z80_CLASS[i] = 0;
@@ -55,7 +55,6 @@ export class Z80Microscope implements Microscope {
   sp = 0;
   h0 = -1;
   h1 = -1;
-  halted = false;
   writes = 0;
   private saved = new Uint8Array(Z80_PAIR);
   private core: Z80Core;

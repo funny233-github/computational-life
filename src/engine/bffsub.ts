@@ -11,7 +11,6 @@ class TapeMicroscope implements Microscope {
   pc = 0;
   h0 = 0;
   h1 = 0;
-  halted = false;
   private ex: Exec | null = null;
   private swapped = false;
 
@@ -38,7 +37,6 @@ class TapeMicroscope implements Microscope {
     this.pc = e.pc;
     this.h0 = e.h0;
     this.h1 = e.h1;
-    this.halted = e.halted;
   }
   step() {
     if (!this.ex) return;

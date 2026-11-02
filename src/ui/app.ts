@@ -63,7 +63,8 @@ let stepsValue = 128;
 /** bumped on every rebuild, so in-flight epochs from the old world are ignored */
 let generation = 0;
 let lastChartEpoch = -1;
-let debugStep: (ms: number) => void = () => {};
+/** set only under ?debug; null keeps the hot loop free of clock reads */
+let debugStep: ((ms: number) => void) | null = null;
 
 function resizeGrid() {
   if (world) {
@@ -310,9 +311,11 @@ function tickSync(now: number) {
     const t0 = performance.now();
     let n = 0;
     while (n < epPerFrame && performance.now() - t0 < budget) {
-      const s0 = performance.now();
-      w.stepSync();
-      debugStep(performance.now() - s0);
+      if (debugStep) {
+        const s0 = performance.now();
+        w.stepSync();
+        debugStep(performance.now() - s0);
+      } else w.stepSync();
       n++;
     }
     rateEpochs += n;
@@ -330,9 +333,11 @@ async function tickBody(now: number) {
     const t0 = performance.now();
     let n = 0;
     while (n < epPerFrame && performance.now() - t0 < budget) {
-      const s0 = performance.now();
-      await w.step();
-      debugStep(performance.now() - s0);
+      if (debugStep) {
+        const s0 = performance.now();
+        await w.step();
+        debugStep(performance.now() - s0);
+      } else await w.step();
       if (world !== w) return; // the map was rebuilt under us
       n++;
     }
@@ -448,7 +453,6 @@ async function boot() {
   const choices: [string, string][] = [
     ["bytes:1", "字节 · 一格 4×4 / 8×8"],
     ["cell:code", "整格 · 指令类型"],
-
     ["cell:lineage", "整格 · 血统"],
   ];
   for (const [value, label] of choices) {

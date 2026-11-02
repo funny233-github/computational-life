@@ -23,11 +23,10 @@ export function pack(r: number, g: number, b: number): number {
 }
 
 /** rainbow palette — only used by the cell-level identity / lineage views */
-export const PALETTE = new Uint32Array(256);
+const PALETTE = new Uint32Array(256);
 for (let i = 0; i < 256; i++) PALETTE[i] = hsl(i / 256, 0.62, 0.55);
 
 export const BYTE_COLOR = new Uint32Array(256);
-export const BYTE_CSS: string[] = new Array(256);
 export const BYTE_R = new Uint8Array(256);
 export const BYTE_G = new Uint8Array(256);
 export const BYTE_B = new Uint8Array(256);
@@ -75,7 +74,6 @@ export function setTheme(t: Theme) {
     BYTE_R[b] = r;
     BYTE_G[b] = g;
     BYTE_B[b] = bl;
-    BYTE_CSS[b] = `rgb(${r},${g},${bl})`;
   }
   buildZ80(t);
 }
@@ -93,7 +91,6 @@ export function setTheme(t: Theme) {
  * warm, low-contrast range of the surrounding UI.
  */
 export const Z80_COLOR = new Uint32Array(256);
-export const Z80_CSS: string[] = new Array(256);
 
 function buildZ80(t: Theme) {
   for (let i = 0; i < 256; i++) {
@@ -144,10 +141,6 @@ function buildZ80(t: Theme) {
     set(0xd8, 0x5f, 0x5c, 0x44); // ret c
     set(0xc9, 0x5f, 0x5c, 0x44); // ret
   }
-  for (let i = 0; i < 256; i++) {
-    const c = Z80_COLOR[i];
-    Z80_CSS[i] = `rgb(${c & 255},${(c >> 8) & 255},${(c >> 16) & 255})`;
-  }
 }
 
 const Z80_CLASS_COLOR_DARK = [
@@ -171,17 +164,14 @@ const Z80_CLASS_COLOR_LIGHT = [
  * bitmap is the stage, so 4 px per byte means exactly 4 px.
  */
 
-export const CANVAS_BG_DARK = pack(0x1d, 0x1c, 0x1a);
-export const CANVAS_BG_LIGHT = pack(0, 0, 0);
+const CANVAS_BG_DARK = pack(0x1d, 0x1c, 0x1a);
+const CANVAS_BG_LIGHT = pack(0, 0, 0);
 export function canvasBg() {
   return curTheme === "dark" ? CANVAS_BG_DARK : CANVAS_BG_LIGHT;
 }
 
-let z80TextBg = "#131211";
-export function setZ80TextBg(c: string) {
-  z80TextBg = c;
-}
-export const ctx_muted_bg = () => z80TextBg;
+/** backdrop of the two microscope canvases */
+export const ctx_muted_bg = () => "#131211";
 
 
 /** the byte -> colour table for a substrate */

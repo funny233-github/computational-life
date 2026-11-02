@@ -5,10 +5,8 @@
  * This module must stay importable under plain Node (the tests do exactly
  * that), so it must not pull in the worker/wasm plumbing — see factory.ts.
  */
-export type { Substrate, Stat, ChartPoint, Listing, Block, CellMode, Microscope } from "./substrate.ts";
-export { NOP, OP, OP_CHAR, TAPE, BYTE_CLASS, decode, encode } from "./bff.ts";
-export { Z80_STEPS } from "./z80core.ts";
-export { Z80_CLASS } from "./z80sub.ts";
+export type { Substrate, CellMode, Microscope } from "./substrate.ts";
+export { TAPE, decode, encode } from "./bff.ts";
 
 import { BYTE_CLASS, NOP, OP, OP_CHAR } from "./bff.ts";
 

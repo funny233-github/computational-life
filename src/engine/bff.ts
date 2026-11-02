@@ -20,16 +20,16 @@ export const PAIR = 128;
 
 /** op ids; a byte 0..255 maps to one of these through OP[] */
 export const NOP = 0;
-export const LOOP_START = 1;
-export const LOOP_END = 2;
-export const PLUS = 3;
-export const MINUS = 4;
-export const COPY01 = 5; // '.'  tape[h1] = tape[h0]
-export const COPY10 = 6; // ','  tape[h0] = tape[h1]
-export const DEC0 = 7; //   '<'
-export const INC0 = 8; //   '>'
-export const DEC1 = 9; //   '{'
-export const INC1 = 10; //  '}'
+const LOOP_START = 1;
+const LOOP_END = 2;
+const PLUS = 3;
+const MINUS = 4;
+const COPY01 = 5; // '.'  tape[h1] = tape[h0]
+const COPY10 = 6; // ','  tape[h0] = tape[h1]
+const DEC0 = 7; //   '<'
+const INC0 = 8; //   '>'
+const DEC1 = 9; //   '{'
+const INC1 = 10; //  '}'
 export const NULL = 11; //  byte 0x00 — the only "false" for loops
 
 /** byte -> op */

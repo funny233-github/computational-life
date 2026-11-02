@@ -33,7 +33,7 @@ export interface Stats {
 const TOKENS_AT = (n: number) => Math.ceil((n * TAPE) / 8) * 8;
 
 /** mulberry32 */
-export function rng(seed: number) {
+function rng(seed: number) {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -45,14 +45,14 @@ export function rng(seed: number) {
 }
 
 /** 32-bit mix, used to derive independent streams from (seed, epoch, index) */
-export function mix32(x: number): number {
+function mix32(x: number): number {
   let h = x >>> 0;
   h = Math.imul(h ^ (h >>> 16), 0x7feb352d);
   h = Math.imul(h ^ (h >>> 15), 0x846ca68b);
   return (h ^ (h >>> 16)) >>> 0;
 }
 
-export function streamSeed(a: number, b: number, c: number): number {
+function streamSeed(a: number, b: number, c: number): number {
   return mix32(mix32(a >>> 0) ^ Math.imul(b | 0, 0x9e3779b1) ^ Math.imul(c | 0, 0x85ebca77));
 }
 
