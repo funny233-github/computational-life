@@ -12,7 +12,9 @@ from Simple Interaction*，Agüera y Arcas 等，arXiv:2406.19108。
 * `paradigms-of-intelligence/cubff` — BFF 与 Forth（§2、§3.1）
 
 `z80worker.wasm` 是从 `znah/zff` 原样取来的二进制（里面是 superzazu/z80 内核），
-不是本项目自己编的；来源、SHA-256 和许可全文见 [THIRD-PARTY.md](THIRD-PARTY.md)。
+不是本项目自己编的。第三方材料集中在 `src/engine/vendor/`，许可文本跟着文件走：
+[`vendor/z80/`](src/engine/vendor/z80/README.md)（`LICENSE` + `LICENSE-z80` + 来源说明），
+总索引见 [THIRD-PARTY.md](THIRD-PARTY.md)。
 
 ## 两种基底
 
@@ -251,8 +253,9 @@ data: worker 包装成 blob: URL 那套技巧（`workerFactory.ts` 已删除）�
 src/engine/         后端：没有 DOM，没有颜色，不认识 canvas
   substrate.ts        Substrate 接口 —— 前后端唯一的契约
   bff.ts soup.ts     BFF 解释器与汤
-  z80core.ts        Z80 核：fetch 参考实现的 z80worker.wasm 并实例化
+  z80core.ts        Z80 核：fetch 参考实现的 wasm 并实例化
   z80wasm.ts        那个 wasm 的资源 URL（new URL + import.meta.url）
+  vendor/z80/       第三方：z80worker.wasm + 两份 LICENSE + 来源说明
   z80soup.ts        Z80 汤
   z80sub.ts bffsub.ts 把两种基质适配成 Substrate
   z80desc.ts         每条指令一句人话（带当前寄存器值）

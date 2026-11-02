@@ -1,6 +1,6 @@
 node_modules/
 
-# build output — `npm run build` recreates it (single self-contained dist/index.html)
+# build output — `npm run build` recreates the whole static site
 dist/
 
 # debug leftovers: headless-chromium screenshots and probe pages are named .*.png
