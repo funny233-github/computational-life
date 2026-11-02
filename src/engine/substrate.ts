@@ -92,6 +92,8 @@ export interface PairPool {
   info: PoolInfo;
   /** false until every worker has finished booting (compiling wasm, etc.) */
   readonly ready: boolean;
+  /** true once the pool gave up; a restart does *not* set it */
+  readonly degraded: boolean;
   step(): Promise<boolean>;
   setThreads(n: number): string;
   dispose(): void;

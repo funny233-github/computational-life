@@ -37,21 +37,23 @@ npm run play     # 构建 + 起一个带 COOP/COEP 的静态服务器（多线�
 
 带头的静态服务器是必须的：`SharedArrayBuffer` 只在**跨源隔离**的页面里可用，
 `npm run play` 会发 `COOP: same-origin` + `COEP: require-corp`。
-`dist/` 是普通的静态站点（HTML + JS + CSS + wasm 四个文件），
+`dist/` 是普通的静态站点（HTML + 主 JS + CSS + worker JS + wasm，五个文件），
 扔到任何能自己配这两个头的服务器上都行。
 
 ## 界面
 
-左上是汤，右边从上到下是：指标曲线、世界参数、lab（单格显微镜）。
+左上是汤，右边从上到下三张卡片：**汤**（指标 + 曲线）、**世界**（速度 / 突变率 /
+地图 / 线程 / 显示 / 配色）、**显微镜**（格子、读写历史、指令解说、反汇编）。
+顶栏是轮数、轮每秒、基质名和暂停键；标题栏右边的 `⟩` 收起侧栏。
 
 | 操作 | 作用 |
 |---|---|
-| 点格子 | 选中并载入显微镜：该格 ++ 右邻居拼成 128 字节，可执行 |
+| 点格子 | 选中并载入显微镜：该格 ++ 右邻居拼成 32 字节（Z80）/ 128 字节（BFF），可执行 |
 | `空格` | 暂停 / 继续 |
-| **种下复制子** | 在选中格周围种下 5×5 个手写复制子，几秒就能看到吞并波 |
-| 编辑文本框 + **写入世界** | 把你写的程序写进选中格 |
+| **种下复制子** | 在选中格周围种下 5×5 个手写复制子，几秒就能看到吞并波（BFF 专用） |
+| 编辑文本框 + **写入世界** | 把你写的程序写进选中格（BFF 专用，Z80 模式下隐藏） |
 
-**显示**（放大倍数与配色合一）：
+**显示**（缩放不在这里，用滚轮；配色是另一个下拉）：
 
 | 选项 | 一格 = | 看什么 |
 |---|---|---|
@@ -108,23 +110,26 @@ npm run play     # 构建 + 起一个带 COOP/COEP 的静态服务器（多线�
 
 **配色**：`暗色`（默认）是暖灰底 + 低饱和的指令色，长时间看不刺眼；`亮色（原作）` 是 zff 里
 `set_color()` 的原值（灰阶 64–96、`LD BC,nn` 纯正红等），用来逐像素对照官方实现。
+`暗色` 是把同一批色相压暗降饱和（灰阶 38–72）得到的，色相和原作一一对应。
 
-**世界参数**：速度 / 突变率 / 代码密度 / 步数上限 / 邻居半径，改突变率
-即时生效，改其余的重置后生效。
+**世界参数**：速度 / 突变率（两种基质都有），代码密度 / 步数上限 / 邻居半径
+（只有 BFF 有，Z80 的这几项在参考实现里是写死的，界面上直接隐藏）。
+改突变率即时生效，改其余的重置后生效。
 
 **线程**：一轮里的配对互不重叠，所以可以切片交给多个 worker 并行跑。
 计划（选邻居）和突变翻字节留在主线程，因此**并行结果与单线程逐字节相同**（有测试守着）。
 调这个下拉即时生效，不用重置。
 
-实测（96×54，Chromium，一轮 = 平均 2600 次交互）：
+实测（96×54，Chromium，一轮 ≈ 1300 对、2600 条程序同时被改写）：
 
 | 线程 | 每轮耗时 | 吞吐 |
 |---|---|---|
-| 1 | 2.05 ms | 361 轮/秒 |
-| 3 | 1.06 ms | 688 轮/秒 |
-| 7 | 0.74 ms | 930 轮/秒 |
+| 1 | 2.17 ms | 354 轮/秒 |
+| 3 | 1.12 ms | 658 轮/秒 |
+| 7 | 0.76 ms | 913 轮/秒 |
 
-（7 线程以上的吞吐会被界面的"每帧轮数"卡住，把速度滑杆拉高还能再快。）
+（吞吐还受「速度」——每帧最多跑几轮——和 30fps 的重绘节流限制，
+把速度拉高还能更快，7 线程已经接近这张卡片的实际上限。）
 
 要真正并行，页面必须是**跨源隔离**的（`COOP: same-origin` + `COEP: require-corp`），
 因为浏览器只在那种页面里允许 `SharedArrayBuffer`：
@@ -171,14 +176,14 @@ npm run play     # 起一个带这两个头的服务器，然后开 http://local
 
 | 参数 | 原版 | 这里 |
 |---|---|---|
-| 程序数 | 131,072（0 维汤）/ 240×135（2D） | 96×54 = 5,184 |
+| 程序数 | 131,072（cubff 的一维汤） | 96×54 = 5,184（2D 格点） |
 | 单条 tape | 64 B | 64 B |
 | 配对后 tape | 128 B | 128 B |
 | 每交互步数上限 | 8,192（`8 * 1024` 写死） | 8,192 |
 | 突变率 | `1/(256*16)` | 同 |
 | 邻居半径 | 2（切比雪夫） | 同 |
 | 初始化 | 均匀随机字节 | 同 |
-| 复杂度指标 | brotli -q2, lgwin 24 | 采样 tracer token 占比 |
+| 复杂度指标 | brotli -q2, lgwin 24 | 血统占比 + 多样性（不同 token 数） |
 
 只有规模差 25 倍，规则和概率完全一致。
 
@@ -209,27 +214,8 @@ npm run play     # 起一个带这两个头的服务器，然后开 http://local
 * 想立刻看机制 → **seed replicator**，看波前怎么扩散；
 * 想看自发涌现 → 让它挂着跑（后台标签页用的是定时器，不会被 rAF 掐停），
   或者调高 mutation / code density 加速；
-* 想批量跑 → `node scripts/sim.ts 96 54 200000 0.0004096 8192 1`
-  （最后一个参数 1 = 0 维汤）。
-
-## 文件
-
-```
-src/bff.ts        指令集 + 解释器（逐条对齐参考实现）
-src/soup.ts       2D / 0D 原始汤，含 tracer token
-src/render.ts     渲染：参考实现配色、8×8 字节视图、lab 显微镜、曲线
-src/main.ts       UI 与主循环
-src/programs.ts   手写复制子
-scripts/sim.ts    无头长跑
-scripts/z80.test.ts   Z80 核是否真的在执行、栈写入是否落到汤里、熵是否下降
-scripts/bff.test.ts   两种解释器实现互相验算 + 复制子是否还能复制
-scripts/smoke.mjs     假 DOM 跑一遍打包产物：抓运行时错误、控件没接线
-scripts/render.test.ts 渲染层单测：三种配色 / 各 zoom 档
-```
-
-Z80 的配色取自参考实现（`js/main.js` 的 `set_color`）：默认是 64..95 的深灰，
-`0x00` 纯黑，`LD BC,nn` 红、`LD DE,nn` 绿、`LD HL,nn` 蓝、`LD HL,(nn)` 白、
-`PUSH` 系列淡彩、`ED` 与 `LDIR/LDDR` 红、`EX (SP),HL` 黄绿。
+* 想批量跑 → `node scripts/sim.ts 96 54 200000 0.000244 8192 1`
+  （参数依次是 w h 轮数 突变率 步数 mixed，最后一个 1 = 0 维汤）。
 
 `npm run build` 产出普通的静态站点：
 
@@ -241,7 +227,7 @@ dist/assets/z80worker-*.wasm    26 KB   （单独一份，按内容哈希缓存�
 dist/assets/z80worker-*.js       1.7 KB （worker）
 ```
 
-wasm 是真正的资源文件，不是 base64 字符串：`new URL("./z80worker.wasm",
+wasm 是真正的资源文件，不是 base64 字符串：`new URL("./vendor/z80/z80worker.wasm",
 import.meta.url)` 让 Vite 把它当 asset 处理，浏览器可以单独缓存它，
 devtools 里也能看到一次 200 的请求而不是一坨内联字节。
 worker 同样走 `?worker` 导入，是**同源**的真文件——所以不需要再把内联
@@ -253,15 +239,18 @@ data: worker 包装成 blob: URL 那套技巧（`workerFactory.ts` 已删除）�
 src/engine/         后端：没有 DOM，没有颜色，不认识 canvas
   substrate.ts        Substrate 接口 —— 前后端唯一的契约
   bff.ts soup.ts     BFF 解释器与汤
+  programs.ts        手写复制子（BFF 的 64 字节回文程序）
   z80core.ts        Z80 核：fetch 参考实现的 wasm 并实例化
   z80wasm.ts        那个 wasm 的资源 URL（new URL + import.meta.url）
   vendor/z80/       第三方：z80worker.wasm + 两份 LICENSE + 来源说明
   z80soup.ts        Z80 汤
+  z80disasm.ts       指令表（转写自 disz80，见 THIRD-PARTY）
   z80sub.ts bffsub.ts 把两种基质适配成 Substrate
   z80desc.ts         每条指令一句人话（带当前寄存器值）
   index.ts           公开面：类型 + 常量表 + decode/encode/opChar
   factory.ts         唯一碰 worker/wasm 的模块
-  pool.ts worker.ts  并行
+  pool.ts worker.ts    BFF 的并行（worker 入口 + 切片）
+  z80pool.ts z80worker.ts  Z80 的并行（同一套 barrier，只是数据是 32 字节配对）
 
 src/ui/             前端：不认识解释器，只知道 Substrate
   app.ts             接线（控件、主循环、显微镜）
@@ -276,6 +265,27 @@ src/main.ts         两行：引入样式和 app
 引擎交给界面的只有**数据**：字节、统计、反汇编文本、以及一个语义键（`cellKey`：
 指令家族 0–4 / 内容哈希 0–255 / 血统 0–63）。把语义键变成颜色是界面的工作，
 所以换配色不需要碰引擎，换引擎也不需要碰颜色。
+
+## 测试
+
+`npm test` = 构建 + 下面全部，任何一条失败都返回非零：
+
+```
+scripts/layers.test.ts   分层边界：引擎里不许出现 document/window/canvas，
+                         界面只许 import engine 的三个入口
+scripts/bff.test.ts      BFF 解释器两种实现互相验算 + 复制子还能复制
+scripts/z80.test.ts      Z80 核真的在执行、栈写入落到汤里、熵下降、
+                         助记符字形与指令长度
+scripts/z80par.test.ts   并行切片 == 串行（逐字节），含大图分块
+scripts/par.test.ts      BFF 并行 == 串行
+scripts/render.test.ts   渲染：三种视图互不相同、像素级对齐
+scripts/zoom.test.ts     相机三条公式：cellAt / camFor / blitRect
+scripts/insight.test.ts  指令解说：每条家族一句话，用手写寄存器钉住
+scripts/smoke.mjs        假 DOM 跑一遍打包产物：运行时错误、控件没接线
+```
+
+`scripts/wasm.ts` 是测试用的加载器（从 `src/engine/vendor/z80/` 读二进制，
+不走 fetch）。`scripts/sim.ts` 是无头长跑，不在测试里。
 
 `scripts/layers.test.ts` 会强制这条边界：
 引擎里出现 `document`/`window`/`canvas` 就失败；界面里 `import "../engine/..."`

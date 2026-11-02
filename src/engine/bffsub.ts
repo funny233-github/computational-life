@@ -82,8 +82,10 @@ export class BffSubstrate implements Substrate {
     }
     const pool = this.pool;
     const ok = await pool.step();
-    // a stale reply must not kill a pool that was just rebuilt
-    if (!ok && this.pool === pool) this.pool = null;
+    // `false` means "this epoch was dropped": either the pool is dead
+    // (degraded) or the worker set was replaced mid-epoch. Only the first case
+    // may cost us the pool — the second one just restarted it.
+    if (!ok && this.pool === pool && pool.degraded) this.pool = null;
     return ok;
   }
   stepSync() {
