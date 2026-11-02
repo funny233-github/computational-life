@@ -1,4 +1,4 @@
-import { Z80_WASM_B64 } from "./z80wasm.ts";
+import { Z80_WASM_URL } from "./z80wasm.ts";
 
 /**
  * Byte offsets inside the `z80` struct the wasm hands us (see the reference's
@@ -76,16 +76,11 @@ export interface Z80Core {
   trace(steps: number): void;
 }
 
-function decodeB64(s: string): Uint8Array {
-  const bin = atob(s);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
-/** instantiate the embedded core once */
-export async function loadZ80(): Promise<Z80Core> {
-  const bytes = decodeB64(Z80_WASM_B64);
+/**
+ * Instantiate the core from raw bytes. Tests use this with `fs.readFile`, the
+ * browser goes through `loadZ80()` below — same code path after the fetch.
+ */
+export async function instantiateZ80(bytes: BufferSource): Promise<Z80Core> {
   const res = (await WebAssembly.instantiate(bytes, {})) as unknown as { instance?: WebAssembly.Instance } & WebAssembly.Instance;
   const instance = res.instance ?? res;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -104,4 +99,11 @@ export async function loadZ80(): Promise<Z80Core> {
     run: (n: number, steps: number) => ex.run(n, steps) as number,
     trace: (steps: number) => ex.z80_trace(steps) as void,
   };
+}
+
+/** fetch the asset and instantiate it; one call = one independent instance */
+export async function loadZ80(): Promise<Z80Core> {
+  const res = await fetch(Z80_WASM_URL);
+  if (!res.ok) throw new Error(`拿不到 z80worker.wasm（HTTP ${res.status}）`);
+  return instantiateZ80(await res.arrayBuffer());
 }

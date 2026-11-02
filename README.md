@@ -19,15 +19,21 @@ from Simple Interaction*，Agüera y Arcas 等，arXiv:2406.19108。
 | 显示 | 4×4，一个方块一个字节 | 8×8，一个方块一个字节 |
 | 执行 | 真的跑 Z80 指令，每交互 128 步 | BFF 指令集，每交互 8192 步 |
 | 内存 | 两格拼成 32 字节，地址 `& 31` | 两格拼成 128 字节 |
-| 备注 | 内嵌参考实现的 `z80worker.wasm` | 纯 TypeScript，可并行 |
+| 备注 | 跑参考实现的 `z80worker.wasm` | 纯 TypeScript，可并行 |
 
 ## 跑起来
 
 ```bash
-open dist/index.html      # 已构建好的单文件版本，双击即可，不需要服务器
+npm install
+npm run dev      # 开发服务器 http://localhost:5173
 # 或者
-npm install && npm run dev
+npm run play     # 构建 + 起一个带 COOP/COEP 的静态服务器（多线程要它）
 ```
+
+带头的静态服务器是必须的：`SharedArrayBuffer` 只在**跨源隔离**的页面里可用，
+`npm run play` 会发 `COOP: same-origin` + `COEP: require-corp`。
+`dist/` 是普通的静态站点（HTML + JS + CSS + wasm 四个文件），
+扔到任何能自己配这两个头的服务器上都行。
 
 ## 界面
 
@@ -122,8 +128,8 @@ npm install && npm run dev
 npm run play     # 起一个带这两个头的服务器，然后开 http://localhost:5173
 ```
 
-直接双击 `dist/index.html`（`file://`）时浏览器禁用 `SharedArrayBuffer`，
-下拉会显示"只能用单线程"，这是浏览器的限制，不是代码路径。
+用 `file://` 直接打开（或服务器没发那两个头）时浏览器禁用 `SharedArrayBuffer`，
+下拉会显示"只能用单线程"——这是浏览器的安全限制，不是代码路径。
 
 **显微镜**：`▶ 运行` 连续播放，`单步 ×N` 一次走 N 条指令（N 就是"每帧步数"，
 设成 1 就是严格单步），`⇄ 交换` 交换 A/B 两半（`A+B` 和 `B+A` 是两次不同的
@@ -220,9 +226,21 @@ Z80 的配色取自参考实现（`js/main.js` 的 `set_color`）：默认是 64
 `0x00` 纯黑，`LD BC,nn` 红、`LD DE,nn` 绿、`LD HL,nn` 蓝、`LD HL,(nn)` 白、
 `PUSH` 系列淡彩、`ED` 与 `LDIR/LDDR` 红、`EX (SP),HL` 黄绿。
 
-`npm run build` 产出 `dist/index.html`（单文件、无外部依赖、classic script，
-`file://` 直接打开就能跑）。构建后会把内联脚本挪到 `</body>` 之前，
-否则 classic script 会在 DOM 就绪前执行。
+`npm run build` 产出普通的静态站点：
+
+```
+dist/index.html                  6.7 KB
+dist/assets/index-*.js          70 KB   （gzip 26 KB）
+dist/assets/index-*.css         12 KB
+dist/assets/z80worker-*.wasm    26 KB   （单独一份，按内容哈希缓存）
+dist/assets/z80worker-*.js       1.7 KB （worker）
+```
+
+wasm 是真正的资源文件，不是 base64 字符串：`new URL("./z80worker.wasm",
+import.meta.url)` 让 Vite 把它当 asset 处理，浏览器可以单独缓存它，
+devtools 里也能看到一次 200 的请求而不是一坨内联字节。
+worker 同样走 `?worker` 导入，是**同源**的真文件——所以不需要再把内联
+data: worker 包装成 blob: URL 那套技巧（`workerFactory.ts` 已删除）。
 
 ## 目录：引擎与界面是分开的
 
@@ -230,7 +248,8 @@ Z80 的配色取自参考实现（`js/main.js` 的 `set_color`）：默认是 64
 src/engine/         后端：没有 DOM，没有颜色，不认识 canvas
   substrate.ts        Substrate 接口 —— 前后端唯一的契约
   bff.ts soup.ts     BFF 解释器与汤
-  z80core.ts        Z80 核（内嵌参考实现的 wasm）
+  z80core.ts        Z80 核：fetch 参考实现的 z80worker.wasm 并实例化
+  z80wasm.ts        那个 wasm 的资源 URL（new URL + import.meta.url）
   z80soup.ts        Z80 汤
   z80sub.ts bffsub.ts 把两种基质适配成 Substrate
   z80desc.ts         每条指令一句人话（带当前寄存器值）
@@ -258,7 +277,7 @@ src/main.ts         两行：引入样式和 app
 
 ## 构建环境
 
-项目本身只有三个普通 devDependency（typescript / vite / vite-plugin-singlefile），
+项目本身只有两个普通 devDependency（typescript / vite），
 没有任何平台特定的包——rollup 的原生二进制由 npm 按平台自动挑（`optionalDependencies`）。
 
 如果你在 **Alpine / musl 容器**里构建（比如本项目的开发沙箱），npm 可能因为某个已知 bug

@@ -1,6 +1,5 @@
 import { Soup, type SoupOptions } from "./soup.ts";
-import InlineWorker from "./worker?worker&inline";
-import { sameOriginWorker } from "./workerFactory.ts";
+import WorkerCtor from "./worker?worker";
 
 import type { PoolInfo } from "./substrate.ts";
 export type { PoolInfo };
@@ -104,7 +103,7 @@ export class Pool {
     const opts = this.opts;
     const state = this.state;
     for (let i = 0; i < cores; i++) {
-      const w = sameOriginWorker(InlineWorker);
+      const w = new WorkerCtor();
       w.onerror = () => this.fail("worker 出错");
       w.onmessage = (e: MessageEvent) => {
         if (e.data.type === "ready") {

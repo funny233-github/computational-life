@@ -1,12 +1,13 @@
 /** the Z80 substrate: real emulation, real soup, real mnemonics */
-import { loadZ80, Z80_STEPS } from "../src/engine/z80core.ts";
+import { Z80_STEPS } from "../src/engine/z80core.ts";
+import { loadCore } from "./wasm.ts";
 import { Z80World } from "../src/engine/z80soup.ts";
 import { BYTE2ASM } from "../src/engine/z80disasm.ts";
 import { drawWindowBytes, drawWindowCells } from "../src/ui/canvas.ts";
 import { Z80_COLOR, cellColor } from "../src/ui/palette.ts";
 import { instrLen, shortAsm, Z80Substrate } from "../src/engine/z80sub.ts";
 
-const core = await loadZ80();
+const core = await loadCore();
 
 // 1. the emulator actually runs: LD BC,0x1234 then HALT
 const prog = new Uint8Array(32);

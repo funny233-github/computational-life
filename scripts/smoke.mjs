@@ -1,11 +1,22 @@
-// Smoke test: run the built single-file bundle against a fake DOM.
+// Smoke test: run the built bundle against a fake DOM.
 // Catches typos in element ids, null derefs, and runtime errors in the sim loop.
 import fs from "node:fs";
 import vm from "node:vm";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 const html = fs.readFileSync("dist/index.html", "utf8");
-const m = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)];
-const code = m[m.length - 1][1];
+// the build emits a real <script src>, so the bundle is a file next to it
+const tag = html.match(/<script[^>]*src="([^"]+)"[^>]*><\/script>/);
+if (!tag) {
+  console.error("FAIL: dist/index.html has no script src");
+  process.exit(1);
+}
+const jsPath = path.join("dist", tag[1].replace(/^\.\//, ""));
+const baseUrl = pathToFileURL(path.resolve(jsPath)).href;
+// the bundle is an IIFE that mentions `import.meta.url` for its asset URLs;
+// a classic script has no such thing, so substitute the real bundle URL
+const code = fs.readFileSync(jsPath, "utf8").replace(/import\.meta\.url/g, JSON.stringify(baseUrl));
 
 function el(tag = "div", id = "") {
   const e = {
@@ -45,12 +56,10 @@ function el(tag = "div", id = "") {
   return e;
 }
 
-// which ids exist before the script tag runs?  anything after it is a null lookup
-const scriptAt = html.lastIndexOf("<script");
+// every id the page declares; the module runs after parsing, so any lookup
+// outside this set is a typo
 const declared = new Set();
-for (const mm of html.matchAll(/id="([^"]+)"/g)) {
-  if (mm.index < scriptAt) declared.add(mm[1]);
-}
+for (const mm of html.matchAll(/id="([^"]+)"/g)) declared.add(mm[1]);
 const missing = new Set();
 
 const byId = new Map();
@@ -83,7 +92,20 @@ const ctxObj = {
   console, Math, Date,
   navigator: { hardwareConcurrency: 8 },
   location: { search: "?bff" },   // exercise the BFF substrate here; z80 has its own test
-  WebAssembly, atob,
+  WebAssembly, atob, URL, URLSearchParams,
+  // the module-preload polyfill in front of the bundle wants this
+  MutationObserver: class {
+    observe() {}
+    disconnect() {}
+  },
+  // the engine fetches its wasm asset; here it comes straight off the disk
+  fetch: async (url) => {
+    const file = String(url).startsWith("file:")
+      ? new URL(String(url))
+      : new URL(String(url), baseUrl);
+    const bytes = fs.readFileSync(file);
+    return { ok: true, status: 200, arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) };
+  },
 };
 ctxObj.globalThis = ctxObj;
 ctxObj.self = ctxObj;
@@ -239,10 +261,7 @@ if (p1 !== p0) {
   gridCanvas.fire("wheel", { ...pt, deltaY: -240 });
   await pump(40);
   gridCanvas.fire("click", pt);
-  console.log("geo after:", gridCanvas.dataset.geo);
-  console.log("click resolved:", gridCanvas.dataset.sel);
   const after = g("hint");
-  console.log("hint before/after:", before, "/", after);
   if (before !== after) {
     console.error(`FAIL: zoom drifted (${before} -> ${after})`);
     process.exit(1);

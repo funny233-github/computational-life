@@ -1,5 +1,4 @@
-import InlineWorker from "./z80worker?worker&inline";
-import { sameOriginWorker } from "./workerFactory.ts";
+import Z80Worker from "./z80worker?worker";
 import { Z80World, type Z80Options } from "./z80soup.ts";
 import type { Z80Core } from "./z80core.ts";
 import type { PairPool, PoolInfo } from "./substrate.ts";
@@ -77,7 +76,7 @@ export class Z80Pool implements PairPool {
     this.done = 0;
     this.readyCount = 0;
     for (let i = 0; i < cores; i++) {
-      const w = sameOriginWorker(InlineWorker);
+      const w = new Z80Worker();
       w.onerror = (ev: ErrorEvent) => {
         console.error("[z80 worker]", ev.message, ev.filename, ev.lineno);
         this.fail("worker 出错: " + ev.message);

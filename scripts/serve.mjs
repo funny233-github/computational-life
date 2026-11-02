@@ -13,6 +13,7 @@ const types = {
   ".js": "text/javascript",
   ".css": "text/css",
   ".png": "image/png",
+  ".wasm": "application/wasm",
   ".svg": "image/svg+xml",
 };
 

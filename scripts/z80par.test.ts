@@ -3,11 +3,12 @@
  * running it on one core: the plan and the mutation flips stay on the main
  * thread, so only the per-pair work is redistributed.
  */
-import { loadZ80, Z80_STEPS } from "../src/engine/z80core.ts";
+import { Z80_STEPS } from "../src/engine/z80core.ts";
+import { loadCore } from "./wasm.ts";
 import { Z80World, runPairs } from "../src/engine/z80soup.ts";
 
-const coreA = await loadZ80();
-const coreB = await loadZ80();
+const coreA = await loadCore();
+const coreB = await loadCore();
 const base = { w: 48, h: 27, seed: 99, noise: 1 / 16, steps: Z80_STEPS };
 
 const serial = new Z80World(coreA, base);
@@ -46,9 +47,9 @@ console.log(`z80 parallel(2 slices) == serial over ${EPOCHS} epochs  [${h}]`);
 
 // a single slice must also equal the plain serial path
 const solo = new Z80World(null, { ...base, buffer: new SharedArrayBuffer(state.byteLength) });
-const coreC = await loadZ80();
+const coreC = await loadCore();
 const soloPlan = new Int32Array(8192 * 2);
-const ref = new Z80World(await loadZ80(), base);
+const ref = new Z80World(await loadCore(), base);
 for (let e = 0; e < 5; e++) {
   ref.step();
   const n = solo.planInto(soloPlan);
@@ -69,10 +70,10 @@ console.log("z80 one-slice path == serial");
 // must not change the result — nor may it disagree with a 2-way split.
 {
   const bigBase = { w: 192, h: 108, seed: 7, noise: 1 / 16, steps: Z80_STEPS };
-  const bigSerial = new Z80World(await loadZ80(), bigBase);
+  const bigSerial = new Z80World(await loadCore(), bigBase);
   const bigPar = new Z80World(null, { ...bigBase, buffer: new SharedArrayBuffer(Z80World.bufferSize(bigBase.w * bigBase.h)) });
   const bigPlan = new Int32Array(8192 * 2);
-  const cores = [await loadZ80(), await loadZ80()];
+  const cores = [await loadCore(), await loadCore()];
   let maxPairs = 0;
   for (let e = 0; e < 6; e++) {
     bigSerial.step();
