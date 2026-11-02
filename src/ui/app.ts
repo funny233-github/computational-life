@@ -127,12 +127,31 @@ let labRunning = false;
 let labSpeed = 4;
 let labTotal = 0;
 
-/** the legend and the explainer under the microscope, per substrate */
+/**
+ * The legend and the explainer under the microscope, per substrate. Both are
+ * built from small groups so the eye can find one thing at a time: colours
+ * first, then the notation, then how to read the thing.
+ */
 function buildLegend(kind: "z80" | "bff") {
   const box = $("legend");
   box.textContent = "";
-  // swatch + label, or (for the notation entries) a coded symbol + label
-  const item = (cls: string, text: string, code?: string) => {
+
+  const group = (caption: string): HTMLElement => {
+    const wrap = document.createElement("section");
+    wrap.className = "legend-group";
+    const cap = document.createElement("p");
+    cap.className = "cap";
+    cap.textContent = caption;
+    wrap.append(cap);
+    const row = document.createElement("div");
+    row.className = "legend";
+    wrap.append(row);
+    box.append(wrap);
+    return row;
+  };
+
+  /** a colour swatch, or (for the notation) a coded symbol, plus its label */
+  const item = (row: HTMLElement, cls: string, text: string, code?: string) => {
     const el = document.createElement("span");
     el.className = `k ${cls}`;
     if (code) {
@@ -140,36 +159,61 @@ function buildLegend(kind: "z80" | "bff") {
       b.textContent = code;
       el.append(b, " " + text);
     } else el.textContent = text;
-    box.append(el);
+    row.append(el);
   };
+
+  const lines = (entries: [string, string][]) => {
+    const list = $<HTMLUListElement>("lab-note");
+    list.textContent = "";
+    for (const [label, text] of entries) {
+      const li = document.createElement("li");
+      const b = document.createElement("b");
+      b.textContent = label;
+      li.append(b, text);
+      list.append(li);
+    }
+  };
+
   if (kind === "z80") {
-    item("pcz", "pc（本轮指到哪里）");
-    item("b00", "0x00 NOP");
-    item("b01", "0x01");
-    item("b11", "0x11");
-    item("b21", "0x21");
-    item("bed", "0xed 前缀");
-    item("ramp", "其他字节（越亮值越大）");
+    const colours = group("颜色");
+    item(colours, "pcz", "pc");
+    item(colours, "b00", "0x00 NOP");
+    item(colours, "b01", "0x01");
+    item(colours, "b11", "0x11");
+    item(colours, "b21", "0x21");
+    item(colours, "bed", "0xed 前缀");
+    item(colours, "ramp", "其他字节，越亮值越大");
+
     // the grid notation: loads read "src→dst", everything else one glyph
-    for (const [glyph, label] of GRID_LEGEND) item("t", label, glyph);
-    $("lab-note").textContent =
-      "显微镜把 选中的格子 ++ 右邻居 拼成 32 字节（两格各 16 字节）。" +
-      "CPU 每次运行都从 pc=0、sp=0xFFFF 重新开始，所以滑杆是「回放到第 N 步」，不是单步前进。" +
-      "汤里的格子写的是上图那套记法（箭头取自参考演示）；下面的反汇编列表用 disz80 的标准写法，" +
-      "两者是同一张表。";
+    const glyphs = group("记法");
+    for (const [glyph, label] of GRID_LEGEND) item(glyphs, "t", label, glyph);
+
+    lines([
+      ["纸带", "选中的格子 ++ 右邻居，各 16 字节，共 32 字节"],
+      ["滑杆", "每次都从 pc=0、sp=0xFFFF 重新跑，所以是「回放到第 N 步」"],
+      ["占位符", "nn 是 16 位立即数，n 是 8 位立即数，(xx) 是内存"],
+      ["条件", "跳转后面的小写字母：z nz c nc po pe p m"],
+      ["列表", "下面的反汇编用 disz80 的标准写法，和方块上的记法是同一张表"],
+    ]);
     return;
   }
-  item("pc", "pc");
-  item("h0", "head0");
-  item("h1", "head1");
-  item("cls1", "[ ]");
-  item("cls2", "+ - . ,");
-  item("cls3", "< > { }");
-  item("cls4", "0x00");
-  item("data", "数据（深浅 = 值）");
-  $("lab-note").textContent =
-    "显微镜把 选中的格子 ++ 右邻居 拼成一条 128 字节的纸带。只有前半段会从 pc=0 开始执行，所以 ⇄ 交换 是另一次反应。" +
-    "8×8 = 一块一字节（能看清指针一步步挪）；4×4 = 一块四字节（跟汤的粒度一致）。";
+
+  const cells = group("颜色");
+  item(cells, "pc", "pc");
+  item(cells, "h0", "head0");
+  item(cells, "h1", "head1");
+  item(cells, "cls1", "[ ]");
+  item(cells, "cls2", "+ - . ,");
+  item(cells, "cls3", "< > { }");
+  item(cells, "cls4", "0x00");
+  item(cells, "data", "数据，深浅 = 值");
+
+  lines([
+    ["纸带", "选中的格子 ++ 右邻居，共 128 字节"],
+    ["前半段", "只有前 64 字节会从 pc=0 开始执行，所以 ⇄ 交换是另一次反应"],
+    ["粒度", "8×8 = 一块一字节，能看清指针一步步挪；4×4 = 一块四字节，跟汤的粒度一致"],
+    ["单步", "一次前进「每帧步数」那么多条指令，想严格单步就设成 1"],
+  ]);
 }
 
 function drawLabNow() {

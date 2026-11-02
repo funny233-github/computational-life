@@ -554,11 +554,24 @@ textarea:focus {
   font-variant-numeric: tabular-nums;
 }
 
+/* the card holds three groups: colours, notation, and how-to-read */
+#legend {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.cap {
+  margin: 0 0 5px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--outline);
+}
+
 .legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 12px;
-  margin-top: 10px;
+  gap: 5px 12px;
   font-size: 10px;
   color: var(--on-surface-variant);
 }
@@ -566,6 +579,8 @@ textarea:focus {
 .legend .k {
   display: inline-flex;
   align-items: center;
+  gap: 5px;
+  white-space: nowrap;
 }
 
 .legend .k::before {
@@ -573,7 +588,6 @@ textarea:focus {
   display: inline-block;
   width: 8px;
   height: 8px;
-  margin-right: 5px;
   border-radius: 3px;
 }
 
@@ -654,10 +668,25 @@ textarea:focus {
 }
 
 .note {
+  display: grid;
+  gap: 5px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
   color: var(--outline);
   font-size: 11px;
-  line-height: 1.62;
-  margin: 12px 0 0;
+  line-height: 1.55;
+}
+
+.note li {
+  display: grid;
+  grid-template-columns: 3.4em 1fr;
+  gap: 8px;
+}
+
+.note b {
+  color: var(--on-surface-variant);
+  font-weight: 500;
 }
 
 .note i {
