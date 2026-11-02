@@ -56,6 +56,8 @@ let zoomAnchor: [number, number, number, number] | null = null;
 
 let dirty = true;
 let lastDraw = 0;
+/** set by the drag handler so the next animation frame repaints at once */
+let panDirty = false;
 let lastStatsEpoch = -1;
 /** the world settings the sliders currently represent; a rebuild must keep them */
 let mutValue = 1 / 16;
@@ -504,6 +506,13 @@ function frame(now: number) {
     draw();
     lastDraw = now;
   }
+  // dragging is the same deal: follow the pointer on the next frame, not on the
+  // next soup tick (which can be 30ms away and made panning feel stuck)
+  if (panDirty) {
+    draw();
+    panDirty = false;
+    lastDraw = now;
+  }
   tick(now);
   rafId = requestAnimationFrame(frame);
 }
@@ -820,7 +829,13 @@ async function boot() {
     if (e.button !== 0) return;
     dragFrom = [e.clientX, e.clientY];
     dragged = false;
-    canvas.setPointerCapture(e.pointerId);
+    // capture keeps the drag alive when the pointer leaves the stage; a
+    // synthetic event (or a browser without capture) may throw, which is fine
+    try {
+      canvas.setPointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
   });
   canvas.addEventListener("pointermove", (e) => {
     if (!dragFrom) return;
@@ -831,10 +846,19 @@ async function boot() {
     dragFrom = [e.clientX, e.clientY];
     const k = view3d.cellPx() || 1;
     view3d.pan(-dx / k, -dy / k);
+    // mnemonics cost more than the whole blit, so they sit out the drag and
+    // come back once on release
+    view3d.panning = true;
+    panDirty = true;
     dirty = true;
   });
   const endDrag = () => {
     dragFrom = null;
+    if (view3d.panning) {
+      view3d.panning = false;
+      draw();
+      dirty = false;
+    }
   };
   canvas.addEventListener("pointerup", endDrag);
   canvas.addEventListener("pointercancel", endDrag);

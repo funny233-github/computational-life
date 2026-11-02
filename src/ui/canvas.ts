@@ -208,6 +208,10 @@ export class SoupCanvas {
   private readonly debug = location.search.includes("debug");
   /** true while the zoom animation is still running */
   animating = false;
+  /** true while the pointer is dragging the view; text is skipped then */
+  panning = false;
+  /** ?debug: how many times draw() ran, for the browser probes */
+  draws = 0;
 
   private drawMnemonics(
     sub: {
@@ -223,7 +227,7 @@ export class SoupCanvas {
     oy: number,
   ) {
     const px = this.px;
-    if (px < 13 || this.animating) return;
+    if (px < 13 || this.animating || this.panning) return;
     const cell = this.cellPx();
     const sx0 = Math.max(0, Math.floor(this.camX));
     const sy0 = Math.max(0, Math.floor(this.camY));
@@ -353,6 +357,7 @@ export class SoupCanvas {
     mode: CellMode | "bytes",
     selected: number,
   ) {
+    this.draws++;
     const [ox, oy] = this.origin();
     const { k, sh } = this.prepare(sub, mode);
     const cell = this.cellPx();
@@ -372,6 +377,7 @@ export class SoupCanvas {
     }
     this.el.dataset.px = String(this.px);
     if (this.debug) {
+      this.el.dataset.draws = String(this.draws);
       const [ox, oy] = this.origin();
       this.el.dataset.geo = [this.camX, this.camY, this.cellPx(), ox, oy].map((v) => v.toFixed(3)).join(",");
     }
