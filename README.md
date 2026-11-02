@@ -11,6 +11,9 @@ from Simple Interaction*，Agüera y Arcas 等，arXiv:2406.19108。
 * `znah/zff` — Z80 那组实验（§3.3 / Figure 12），本项目的默认基底
 * `paradigms-of-intelligence/cubff` — BFF 与 Forth（§2、§3.1）
 
+`z80worker.wasm` 是从 `znah/zff` 原样取来的二进制（里面是 superzazu/z80 内核），
+不是本项目自己编的；来源、SHA-256 和许可全文见 [THIRD-PARTY.md](THIRD-PARTY.md)。
+
 ## 两种基底
 
 | | Z80（默认） | BFF（`index.html?bff`） |

@@ -2,9 +2,10 @@
  * The reference Z80 core, as a real `.wasm` asset.
  *
  * This is `wasm/z80worker.wasm` from znah/zff (MIT, (c) 2024 Google), which
- * itself wraps superzazu/z80. It is shipped verbatim and loaded through Vite's
- * asset pipeline, so the emulation stays identical to the reference instead of
- * being a re-derivation.
+ * itself wraps superzazu/z80 (MIT, (c) 2019 Nicolas Allemand). It is shipped
+ * verbatim — same bytes as upstream, see THIRD-PARTY.md for the hash, the
+ * provenance and the licence texts — and loaded through Vite's asset pipeline,
+ * so the emulation stays identical to the reference instead of a re-derivation.
  *
  * `new URL(..., import.meta.url)` is the form Vite understands: in dev it
  * resolves to the source path, in a build it becomes the hashed asset URL, and
