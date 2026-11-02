@@ -90,8 +90,8 @@ export function shortAsm(b: number, next?: number): string {
  * table above so the two can never drift apart.
  */
 export const GRID_LEGEND: [string, string][] = [
-  ["src→dst", "装入（nn 立即数 · n 立即数 · (xx) 内存）"],
-  ["▽", "上一条指令的操作数"],
+  ["src→dst", "装入"],
+  ["▽", "上一条的操作数"],
   ["·", "空操作 NOP"],
   ["+B −B", "自增 / 自减"],
   ["↑BC ↓BC", "入栈 / 出栈"],
@@ -99,16 +99,14 @@ export const GRID_LEGEND: [string, string][] = [
   ["− −c", "减 / 带进位减"],
   ["∧ ∨ ⊕", "与 / 或 / 异或"],
   ["≠", "比较 CP"],
-  ["⇒ →", "绝对跳转 / 相对跳转（后缀是条件）"],
-  ["⇨ ⇐", "调用 / 返回"],
+  ["⇒ → ⇨ ⇐", "跳转 / 调用 / 返回"],
   ["↓⇒", "计数循环 DJNZ"],
-  ["⇄", "交换"],
-  ["◀ ▶", "循环 / 移位 左 · 右"],
-  ["▣ □ ▨ ~", "置进位 / 翻转进位 / 十进制调整 / 取反"],
+  ["⇄ ◀ ▶", "交换 / 循环移位"],
+  ["▣ □", "置进位 / 翻进位"],
+  ["▨ ~", "十进调整 / 取反"],
   ["⊘ ⊙", "关 / 开中断"],
   ["▷ ◁", "端口写 / 读"],
-  ["■", "停机 HALT"],
-  ["≫ ≪", "块传送（LDI/LDIR · LDD/LDDR）"],
+  ["■ ≫ ≪", "停机 / 块传送"],
 ];
 
 /** instruction family, for the one-pixel-per-cell "code" view */

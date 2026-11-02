@@ -557,24 +557,27 @@ textarea:focus {
 .legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 12px;
-  margin-top: 10px;
-  font-size: 10px;
+  align-items: center;
+  gap: 8px 14px;
+  margin-top: 12px;
+  font-size: 20px;
+  line-height: 1.25;
   color: var(--on-surface-variant);
 }
 
 .legend .k {
   display: inline-flex;
   align-items: center;
+  gap: 7px;
+  white-space: nowrap;
 }
 
 .legend .k::before {
   content: "";
   display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-right: 5px;
-  border-radius: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
 }
 
 .legend .pc::before {
@@ -655,9 +658,9 @@ textarea:focus {
 
 .note {
   color: var(--outline);
-  font-size: 11px;
-  line-height: 1.62;
-  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 14px 0 0;
 }
 
 .note i {
@@ -670,10 +673,6 @@ textarea:focus {
   font-weight: 500;
 }
 
-/* old markup kept harmless */
-.tape {
-  display: none;
-}
 
 .w-sm {
   width: 62px;
