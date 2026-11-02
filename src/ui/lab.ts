@@ -187,11 +187,16 @@ export function drawTrace(canvas: HTMLCanvasElement, trace: Uint8Array, steps: n
       ctx.fillRect(s * cw, b * ch, Math.max(1, cw), Math.max(1, ch));
     }
   }
+  // the tape is A ++ B, so the upper half is this cell and the lower is the
+  // neighbour: one faint rule marks the split
+  ctx.fillStyle = "rgba(255,255,255,0.12)";
+  ctx.fillRect(0, 16 * ch, W, 1);
   // what is left of the 128-step budget
   ctx.fillStyle = "rgba(255,255,255,0.06)";
   ctx.fillRect(steps * cw, 0, W - steps * cw, H);
   ctx.fillStyle = "#8e8c82";
   ctx.font = "9px ui-monospace, monospace";
-  ctx.fillText(`0`, 1, H - 1);
-  ctx.fillText(`${steps} 步`, W - 46, H - 1);
+  ctx.fillText("0 步", 1, H - 1);
+  const tail = `第 ${steps} 步`;
+  ctx.fillText(tail, W - ctx.measureText(tail).width - 2, H - 1);
 }

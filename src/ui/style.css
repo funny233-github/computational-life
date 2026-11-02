@@ -618,6 +618,23 @@ textarea:focus {
   color: var(--on-surface);
 }
 
+/* the access map under the byte grids */
+.legend .tw::before {
+  background: rgba(217, 119, 87, 0.85);
+}
+
+.legend .tr::before {
+  background: rgba(125, 138, 153, 0.7);
+}
+
+.legend .tp::before {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.legend .tt::before {
+  display: none;
+}
+
 /* Z80 byte colours, straight from palette.ts */
 .legend .pcz::before {
   background: #f5f4ef;
@@ -667,26 +684,17 @@ textarea:focus {
   background: #2b3038;
 }
 
+/* one short sentence per line — nothing in here is allowed to wrap */
 .note {
-  display: grid;
-  gap: 5px;
   margin: 16px 0 0;
-  padding: 0;
-  list-style: none;
+  padding-left: 15px;
   color: var(--outline);
   font-size: 11px;
-  line-height: 1.55;
+  line-height: 1.85;
 }
 
-.note li {
-  display: grid;
-  grid-template-columns: 3.4em 1fr;
-  gap: 8px;
-}
-
-.note b {
-  color: var(--on-surface-variant);
-  font-weight: 500;
+.note li::marker {
+  color: var(--outline);
 }
 
 .note i {

@@ -162,14 +162,13 @@ function buildLegend(kind: "z80" | "bff") {
     row.append(el);
   };
 
-  const lines = (entries: [string, string][]) => {
+  /** the explainer: one short sentence per line, nothing wraps */
+  const lines = (entries: string[]) => {
     const list = $<HTMLUListElement>("lab-note");
     list.textContent = "";
-    for (const [label, text] of entries) {
+    for (const text of entries) {
       const li = document.createElement("li");
-      const b = document.createElement("b");
-      b.textContent = label;
-      li.append(b, text);
+      li.textContent = text;
       list.append(li);
     }
   };
@@ -189,12 +188,28 @@ function buildLegend(kind: "z80" | "bff") {
     for (const [glyph, label] of GRID_LEGEND) item(glyphs, "t", label, glyph);
 
     lines([
-      ["纸带", "选中的格子 ++ 右邻居，各 16 字节，共 32 字节"],
-      ["滑杆", "每次都从 pc=0、sp=0xFFFF 重新跑，所以是「回放到第 N 步」"],
-      ["占位符", "nn 是 16 位立即数，n 是 8 位立即数，(xx) 是内存"],
-      ["条件", "跳转后面的小写字母：z nz c nc po pe p m"],
-      ["列表", "下面的反汇编用 disz80 的标准写法，和方块上的记法是同一张表"],
+      "纸带：选中格 ++ 右邻居，共 32 字节",
+      "每次都从 pc=0 重跑，滑杆是「回放到第 N 步」",
+      "下方列表与方块上的记法同源，都是 disz80",
+      "跳转后缀 z / nz / c / nc / po / pe / p / m 是条件",
+      "nn 是 16 位立即数，n 是 8 位立即数",
+      "(xx) 表示内存间接寻址",
     ]);
+
+    // the access map under the byte grids needs its own legend
+    const trace = $("trace-legend");
+    trace.textContent = "";
+    const t = (cls: string, text: string) => {
+      const el = document.createElement("span");
+      el.className = `k ${cls}`;
+      el.textContent = text;
+      trace.append(el);
+    };
+    t("tw", "写");
+    t("tr", "读");
+    t("tp", "还没跑到的步");
+    t("tt", "横轴 = 第几步，一行 = 一个字节");
+    t("tt", "上半 = 本格，下半 = 右邻");
     return;
   }
 
@@ -208,11 +223,13 @@ function buildLegend(kind: "z80" | "bff") {
   item(cells, "cls4", "0x00");
   item(cells, "data", "数据，深浅 = 值");
 
+  $("trace-legend").textContent = "";
   lines([
-    ["纸带", "选中的格子 ++ 右邻居，共 128 字节"],
-    ["前半段", "只有前 64 字节会从 pc=0 开始执行，所以 ⇄ 交换是另一次反应"],
-    ["粒度", "8×8 = 一块一字节，能看清指针一步步挪；4×4 = 一块四字节，跟汤的粒度一致"],
-    ["单步", "一次前进「每帧步数」那么多条指令，想严格单步就设成 1"],
+    "纸带：选中格 ++ 右邻居，共 128 字节",
+    "只有前 64 字节会从 pc=0 执行",
+    "所以 ⇄ 交换 是另一次反应",
+    "8×8 是一块一字节，4×4 是一块四字节",
+    "一次前进「每帧步数」条指令，严格单步就设成 1",
   ]);
 }
 
