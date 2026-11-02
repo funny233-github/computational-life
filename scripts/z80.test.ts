@@ -60,10 +60,34 @@ if (Z80_COLOR[0x01] === Z80_COLOR[0x00]) {
 }
 console.log("mnemonics and colours loaded");
 
-// 5. the "mnemonics on the grid" view: exactly the reference lab's own strings
-for (const [b, want] of [[0x01, "LD BC,nn"], [0x2a, "LD HL,(nn)"], [0x3e, "LD A,n"], [0x76, "HALT"]] as const) {
+// 5. the grid notation: loads read "src→dst", everything else one glyph
+for (const [b, want] of [
+  [0x01, "nn→BC"], [0x2a, "(nn)→HL"], [0x3e, "n→A"], [0x47, "A→B"], [0x70, "B→(HL)"],
+  [0x76, "■"], [0x00, "·"], [0xc9, "⇐"], [0xc3, "⇒"], [0x18, "→"], [0x18 as number, "→"],
+  [0x20, "→nz"], [0xcd, "⇨"], [0xc5, "↑BC"], [0xc1, "↓BC"], [0x04, "+B"], [0x05, "−B"],
+  [0x80, "±"], [0x88, "±c"], [0x90, "−"], [0xb8, "≠"], [0xa0, "∧"], [0xb0, "∨"], [0xa8, "⊕"],
+  [0xe3, "⇄"], [0x07, "◀"], [0x0f, "▶"], [0xf3, "⊘"], [0xfb, "⊙"], [0x27, "▨"],
+] as const) {
   if (shortAsm(b) !== want) {
     console.error(`FAIL: shortAsm(0x${b.toString(16)}) = ${shortAsm(b)}, want ${want}`);
+    process.exit(1);
+  }
+}
+// every glyph the grid can print must exist in a plain monospace stack; the set
+// is deliberately small (see the comment on shortAsm)
+{
+  const glyphs = new Set<string>();
+  for (let b = 0; b < 256; b++) for (const ch of shortAsm(b)) glyphs.add(ch);
+  const allowed = new Set("→↓↑±−∧∨⊕≠⇒⇐⇨⇄◀▶▣□▨~⊘⊙■▷◁≫≪·+");
+  for (const ch of glyphs) {
+    if (/[0-9A-Za-z(),'#]/.test(ch) || allowed.has(ch)) continue;
+    console.error(`FAIL: glyph ${JSON.stringify(ch)} is not in the checked set`);
+    process.exit(1);
+  }
+}
+for (const [b, next, want] of [[0xed, 0xb0, "≫"], [0xed, 0xb8, "≪"], [0xed, 0xb1, "≠≫"]] as const) {
+  if (shortAsm(b, next) !== want) {
+    console.error(`FAIL: shortAsm(0x${b.toString(16)},0x${next.toString(16)}) = ${shortAsm(b, next)}`);
     process.exit(1);
   }
 }

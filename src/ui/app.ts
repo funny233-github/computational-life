@@ -4,7 +4,7 @@
  */
 import type { Substrate, Microscope } from "../engine/index.ts";
 import { createSubstrate } from "../engine/factory.ts";
-import { decode, encode, maxCores, opChar, TAPE } from "../engine/index.ts";
+import { decode, encode, GRID_LEGEND, maxCores, opChar, TAPE } from "../engine/index.ts";
 import { setTheme, type ViewMode } from "./palette.ts";
 import type { Series } from "./chart.ts";
 import { SoupCanvas } from "./canvas.ts";
@@ -150,15 +150,13 @@ function buildLegend(kind: "z80" | "bff") {
     item("b21", "0x21");
     item("bed", "0xed 前缀");
     item("ramp", "其他字节（越亮值越大）");
-    item("t", "16 位立即数（占 2 字节）", "nn");
-    item("t", "8 位立即数", "n");
-    item("t", "相对跳转偏移", "d / e");
-    item("t", "内存间接寻址", "(nn)");
-    item("t", "空操作，格子里不写字", "NOP");
+    // the grid notation: loads read "src→dst", everything else one glyph
+    for (const [glyph, label] of GRID_LEGEND) item("t", label, glyph);
     $("lab-note").textContent =
       "显微镜把 选中的格子 ++ 右邻居 拼成 32 字节（两格各 16 字节）。" +
       "CPU 每次运行都从 pc=0、sp=0xFFFF 重新开始，所以滑杆是「回放到第 N 步」，不是单步前进。" +
-      "指令文字和缩写都照参考实现那张表（disz80.txt）：nn / n / d / e 是它规定的占位符，NOP 在汤里不写字。";
+      "汤里的格子写的是上图那套记法（箭头取自参考演示）；下面的反汇编列表用 disz80 的标准写法，" +
+      "两者是同一张表。";
     return;
   }
   item("pc", "pc");

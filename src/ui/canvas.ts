@@ -223,7 +223,7 @@ export class SoupCanvas {
     oy: number,
   ) {
     const px = this.px;
-    if (px < 18 || this.animating) return;
+    if (px < 13 || this.animating) return;
     const cell = this.cellPx();
     const sx0 = Math.max(0, Math.floor(this.camX));
     const sy0 = Math.max(0, Math.floor(this.camY));
@@ -231,6 +231,7 @@ export class SoupCanvas {
     ctx.textBaseline = "middle";
     const cols = this.cols();
     const rows = this.rows();
+    const draw: [string, number, number, number, number, number][] = [];
     for (let ry = 0; ry <= rows + 1; ry++) {
       const cy = sy0 + ry;
       if (cy < 0 || cy >= sub.h) continue;
@@ -242,40 +243,44 @@ export class SoupCanvas {
         const gx = ox + (cx - this.camX) * cell;
         const gy = oy + (cy - this.camY) * cell;
         for (const blk of sub.blocks(c)) {
-          const jx = gx + (blk.start % sub.side) * px;
-          const jy = gy + Math.floor(blk.start / sub.side) * px;
-          if (jx < -cell || jy < -cell || jx > this.el.width || jy > this.el.height) continue;
-          // the instruction owns `len` blocks, so the text may not spill past
-          // them: pick a font size that fits, and fall back to the bare colour
-          const text = blk.short === "NOP" ? "" : blk.short;
-          const avail = px * blk.len - 6;
+          const gx2 = gx + (blk.start % sub.side) * px;
+          const gy2 = gy + Math.floor(blk.start / sub.side) * px;
+          if (gx2 < -cell || gy2 < -cell || gx2 > this.el.width || gy2 > this.el.height) continue;
+          const text = blk.short;
+          // the mnemonic has to live inside its own byte cell: spilling into
+          // the neighbour would put dark ink on a dark block
+          const avail = px - 5;
           let fs = Math.min(13, Math.round(px * 0.42));
           if (text && fs >= 7 && avail > 8) {
             // measure once, then scale the size so the whole mnemonic fits
             ctx.font = `500 ${fs}px ${MONO}`;
             const w = ctx.measureText(text).width;
             if (w > avail) fs = Math.floor((fs * avail) / w / 0.97);
-            if (fs >= 7) {
-              // pick ink that survives the block colour underneath
-              const col = byteColors(sub.kind)[sub.bytes()[c * sub.side * sub.side + blk.start]];
-              const lum = ((col & 255) + ((col >> 8) & 255) + ((col >> 16) & 255)) / 3;
-              ctx.font = `500 ${fs}px ${MONO}`;
-              ctx.fillStyle = lum > 105 ? "rgba(28,26,24,0.82)" : mnemonicInk;
-              ctx.fillText(text, jx + 2, jy + px / 2);
-            }
+            if (fs >= 7) draw.push([text, gx2 + 2, gy2 + px / 2, fs, c, blk.start]);
           }
-          // and the bytes that only carry its operand get a small marker
+          // the bytes that only carry the operand are marked with "▽", the way
+          // the demo does it — but not where the mnemonic already sits
           for (let k = 1; k < blk.len; k++) {
             const ox2 = gx + ((blk.start + k) % sub.side) * px;
             const oy2 = gy + Math.floor((blk.start + k) / sub.side) * px;
-            const r2 = Math.max(1, px * 0.09);
-            ctx.fillStyle = "rgba(230,227,220,0.35)";
-            ctx.beginPath();
-            ctx.arc(ox2 + px / 2, oy2 + px / 2, r2, 0, Math.PI * 2);
-            ctx.fill();
+            const ofs = Math.min(13, Math.round(px * 0.55));
+            if (ofs < 7) continue;
+            ctx.font = `500 ${ofs}px ${MONO}`;
+            const mcol = byteColors(sub.kind)[sub.bytes()[c * sub.side * sub.side + blk.start + k]];
+            const mlum = ((mcol & 255) + ((mcol >> 8) & 255) + ((mcol >> 16) & 255)) / 3;
+            ctx.fillStyle = mlum > 105 ? "rgba(28,26,24,0.5)" : "rgba(230,227,220,0.42)";
+            ctx.fillText("▽", ox2 + px / 2 - ofs * 0.32, oy2 + px / 2);
           }
         }
       }
+    }
+    // second pass: the mnemonics themselves, on top of the operand markers
+    for (const [text, x, y, fs, c, start] of draw) {
+      const col = byteColors(sub.kind)[sub.bytes()[c * sub.side * sub.side + start]];
+      const lum = ((col & 255) + ((col >> 8) & 255) + ((col >> 16) & 255)) / 3;
+      ctx.font = `500 ${fs}px ${MONO}`;
+      ctx.fillStyle = lum > 105 ? "rgba(28,26,24,0.82)" : mnemonicInk;
+      ctx.fillText(text, x, y);
     }
   }
 

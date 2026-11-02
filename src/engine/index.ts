@@ -7,6 +7,7 @@
  */
 export type { Substrate, CellMode, Microscope } from "./substrate.ts";
 export { TAPE, decode, encode } from "./bff.ts";
+export { GRID_LEGEND } from "./z80sub.ts";
 
 import { BYTE_CLASS, NOP, OP, OP_CHAR } from "./bff.ts";
 

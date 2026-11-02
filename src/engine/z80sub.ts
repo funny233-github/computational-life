@@ -13,19 +13,103 @@ export function instrLen(b: number): number {
   return 1;
 }
 
-/**
- * The mnemonic as the reference lab writes it (`byte2asm`, disz80.txt), so the
- * grid, the microscope listing and the legend all speak the same language.
- */
-export function shortAsm(b: number): string {
-  return BYTE2ASM[b];
-}
-
 /** one-line label for a whole instruction, ED-prefixed forms included */
-function asmText(b: number, next?: number): string {
+export function asmText(b: number, next?: number): string {
   if (b === 0xed && next !== undefined) return `ED ${ED_NAME[next] ?? BYTE2ASM[next]}`;
   return BYTE2ASM[b];
 }
+
+/** the condition a branch tests, as a lowercase suffix ("JR NZ,e" -> "nz") */
+function cond(name: string): string {
+  const m = name.match(new RegExp("\\b(NZ|Z|NC|C|PO|PE|P|M)\\b"));
+  return m ? m[1].toLowerCase() : "";
+}
+
+const ED_GLYPH: Record<string, string> = {
+  LDI: "≫", LDIR: "≫", LDD: "≪", LDDR: "≪", CPIR: "≠≫", CPDR: "≠≪",
+};
+
+/**
+ * The demo's own grid notation: a load reads "src→dst" (`nn→HL`, `D→L`,
+ * `A→(nn)`), everything else is one glyph, and a byte that only carries an
+ * operand is drawn as "▽". Exact disassembly text is what the microscope list
+ * is for — this is the texture you read the soup by.
+ *
+ * Every glyph below was checked against a plain monospace stack (the reference
+ * demo draws its own glyphs, so there is no table to copy): no tofu boxes.
+ */
+export function shortAsm(b: number, next?: number): string {
+  const name = BYTE2ASM[b] ?? "?";
+  if (b === 0xcb) return "CB";
+  if (b === 0xdd) return "DD";
+  if (b === 0xfd) return "FD";
+  if (b === 0xed) return next === undefined ? "ED" : (ED_GLYPH[ED_NAME[next] ?? ""] ?? "ED");
+
+  const ld = name.match(/^LD (.+),(.+)$/);
+  if (ld) return `${ld[2]}→${ld[1]}`;
+
+  if (name === "NOP") return "·";
+  // +X / -X for the counters, up/down arrows are the stack
+  if (name.startsWith("INC ")) return "+" + name.slice(4);
+  if (name.startsWith("DEC ")) return "−" + name.slice(4);
+  if (name.startsWith("PUSH ")) return "↑" + name.slice(5);
+  if (name.startsWith("POP ")) return "↓" + name.slice(4);
+  if (name.startsWith("ADD ")) return "±";
+  if (name.startsWith("ADC ")) return "±c";
+  if (name.startsWith("SUB ")) return "−";
+  if (name.startsWith("SBC ")) return "−c";
+  if (name.startsWith("AND ")) return "∧";
+  if (name.startsWith("OR ")) return "∨";
+  if (name.startsWith("XOR ")) return "⊕";
+  if (name.startsWith("CP ")) return "≠";
+  if (name.startsWith("JP ")) return "⇒" + cond(name);
+  if (name.startsWith("JR ")) return "→" + cond(name);
+  if (name.startsWith("DJNZ ")) return "↓⇒";
+  if (name.startsWith("CALL ")) return "⇨" + cond(name);
+  if (name.startsWith("RET")) return "⇐" + cond(name);
+  if (name.startsWith("RST ")) return "⇐" + name.slice(4, 5);
+  if (name === "EX" || name.startsWith("EX ")) return "⇄";
+  if (name === "EXX") return "⇄";
+  if (name === "RLCA" || name === "RLA") return "◀";
+  if (name === "RRCA" || name === "RRA") return "▶";
+  if (name === "SCF") return "▣"; // carry set
+  if (name === "CCF") return "□"; // carry flipped
+  if (name === "DAA") return "▨"; // decimal adjust
+
+  if (name === "CPL") return "~";
+  if (name === "DI") return "⊘";
+  if (name === "EI") return "⊙";
+  if (name === "HALT") return "■";
+  if (name.startsWith("OUT ")) return "▷";
+  if (name.startsWith("IN ")) return "◁";
+  return name;
+}
+
+/**
+ * Glyph -> meaning, for the legend under the microscope. Kept next to the
+ * table above so the two can never drift apart.
+ */
+export const GRID_LEGEND: [string, string][] = [
+  ["src→dst", "装入（nn 立即数 · n 立即数 · (xx) 内存）"],
+  ["▽", "上一条指令的操作数"],
+  ["·", "空操作 NOP"],
+  ["+B −B", "自增 / 自减"],
+  ["↑BC ↓BC", "入栈 / 出栈"],
+  ["± ±c", "加 / 带进位加"],
+  ["− −c", "减 / 带进位减"],
+  ["∧ ∨ ⊕", "与 / 或 / 异或"],
+  ["≠", "比较 CP"],
+  ["⇒ →", "绝对跳转 / 相对跳转（后缀是条件）"],
+  ["⇨ ⇐", "调用 / 返回"],
+  ["↓⇒", "计数循环 DJNZ"],
+  ["⇄", "交换"],
+  ["◀ ▶", "循环 / 移位 左 · 右"],
+  ["▣ □ ▨ ~", "置进位 / 翻转进位 / 十进制调整 / 取反"],
+  ["⊘ ⊙", "关 / 开中断"],
+  ["▷ ◁", "端口写 / 读"],
+  ["■", "停机 HALT"],
+  ["≫ ≪", "块传送（LDI/LDIR · LDD/LDDR）"],
+];
 
 /** instruction family, for the one-pixel-per-cell "code" view */
 const Z80_CLASS = new Uint8Array(256);
@@ -213,7 +297,7 @@ export class Z80Substrate implements Substrate {
     while (i < CELL) {
       const b = bytes[i];
       const len = Math.min(instrLen(b), CELL - i);
-      out.push({ start: i, len, short: shortAsm(b) });
+      out.push({ start: i, len, short: shortAsm(b, bytes[i + 1]) });
       i += len;
     }
     return out;
