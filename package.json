@@ -1,0 +1,20 @@
+{
+  "name": "bff-world",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "sim": "node scripts/sim.ts",
+    "test": "npm run build && node scripts/layers.test.ts && node scripts/bff.test.ts && node scripts/z80.test.ts && node scripts/z80par.test.ts && node scripts/par.test.ts && node scripts/render.test.ts && node scripts/zoom.test.ts && node scripts/smoke.mjs",
+    "play": "npm run build && node scripts/serve.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7",
+    "vite-plugin-singlefile": "^2.1.0"
+  }
+}

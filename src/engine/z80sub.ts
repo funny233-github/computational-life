@@ -1,0 +1,255 @@
+import type { Block, CellMode, ChartPoint, Listing, Microscope, PairPool, PoolInfo, Stat, Substrate } from "./substrate.ts";
+import { Z80_PAIR, Z80_STEPS, Z80_TAPE, type Z80Core } from "./z80core.ts";
+import { Z80World } from "./z80soup.ts";
+import { BYTE2ASM, ED_NAME } from "./z80disasm.ts";
+
+/** how many bytes the instruction starting at `b` occupies */
+export function instrLen(b: number): number {
+  const name = BYTE2ASM[b];
+  if (b === 0xcb || b === 0xed || b === 0xdd || b === 0xfd) return 2;
+  if (/nn/.test(name)) return 3;
+  // 8-bit immediates, displacements and relative jumps all eat one more byte
+  if (/(,n|,d|,e)\b/.test(name) || / e$/.test(name) || /\([nd]\)/.test(name)) return 2;
+  return 1;
+}
+
+/**
+ * The mnemonic as the reference lab writes it (`byte2asm`, disz80.txt), so the
+ * grid, the microscope listing and the legend all speak the same language.
+ */
+export function shortAsm(b: number): string {
+  return BYTE2ASM[b];
+}
+
+/** one-line label for a whole instruction, ED-prefixed forms included */
+export function asmText(b: number, next?: number): string {
+  if (b === 0xed && next !== undefined) return `ED ${ED_NAME[next] ?? BYTE2ASM[next]}`;
+  return BYTE2ASM[b];
+}
+
+/** instruction family, for the one-pixel-per-cell "code" view */
+export const Z80_CLASS = new Uint8Array(256);
+for (let i = 0; i < 256; i++) {
+  const m = (BYTE2ASM[i] || "").split(" ")[0];
+  if (i === 0x00) Z80_CLASS[i] = 0;
+  else if (m === "LD" || m === "EX" || m === "EXX" || m === "LDI" || m === "LDD") Z80_CLASS[i] = 1;
+  else if (m === "PUSH" || m === "POP" || m === "RET" || m === "JP" || m === "JR" ||
+           m === "CALL" || m === "DJNZ" || m === "HALT" || m === "RST") Z80_CLASS[i] = 2;
+  else if (m === "LDIR" || m === "LDDR" || m === "CPIR" || m === "CPDR" || m === "ED") Z80_CLASS[i] = 3;
+  else Z80_CLASS[i] = 4;
+}
+
+const CELL = 16;
+
+/**
+ * Replays one interaction (cell ++ right neighbour) from step 0 and lets the
+ * frontend scrub through it. `z80_trace` restarts the CPU from the tape each
+ * call, so "run N steps" is just "reset and run N".
+ */
+export class Z80Microscope implements Microscope {
+  readonly maxSteps = Z80_STEPS;
+  readonly trace = new Uint8Array(Z80_PAIR * Z80_STEPS * 4);
+  tape = new Uint8Array(Z80_PAIR);
+  steps = 0;
+  pc = 0;
+  sp = 0;
+  h0 = -1;
+  h1 = -1;
+  halted = false;
+  writes = 0;
+  private saved = new Uint8Array(Z80_PAIR);
+  private core: Z80Core;
+
+  constructor(core: Z80Core, a: Uint8Array, b: Uint8Array) {
+    this.core = core;
+    this.saved.set(a.subarray(0, Z80_TAPE), 0);
+    this.saved.set(b.subarray(0, Z80_TAPE), Z80_TAPE);
+    this.setSteps(0);
+  }
+
+  setSteps(n: number) {
+    const k = Math.max(0, Math.min(this.maxSteps, n | 0));
+    const batch = this.core.batch;
+    batch.set(this.saved);
+    this.core.trace(k);
+    this.tape.set(batch.subarray(0, Z80_PAIR));
+    this.trace.set(this.core.traceVis.subarray(0, this.trace.length));
+    this.steps = k;
+    // z80 struct: 5 pointers (20) + unsigned long cyc (4) then pc, sp
+    const st = this.core.state;
+    this.pc = st[24] | (st[25] << 8);
+    this.sp = st[26] | (st[27] << 8);
+    this.writes = this.core.writeCount[0] + this.core.writeCount[1];
+  }
+}
+
+export class Z80Substrate implements Substrate {
+  readonly kind = "z80" as const;
+  readonly side = 4;
+  readonly w: number;
+  readonly h: number;
+  readonly n: number;
+  private z: Z80World;
+  private pool: PairPool | null;
+  private spawn: ((n: number) => PairPool | null) | null;
+  private scopeCore: Z80Core | null;
+
+  constructor(
+    z: Z80World,
+    pool: PairPool | null = null,
+    spawn: ((n: number) => PairPool | null) | null = null,
+    scopeCore: Z80Core | null = null,
+  ) {
+    this.z = z;
+    this.pool = pool;
+    this.spawn = spawn;
+    this.scopeCore = scopeCore;
+    this.w = z.w;
+    this.h = z.h;
+    this.n = z.n;
+  }
+  get sync() {
+    // until the workers are up we simply do the work here
+    return this.pool === null || !this.pool.ready;
+  }
+  async step() {
+    if (!this.pool || !this.pool.ready) {
+      this.z.step();
+      return true;
+    }
+    const pool = this.pool;
+    const ok = await pool.step();
+    // a stale reply must not kill a pool that was just rebuilt
+    if (!ok && this.pool === pool) this.pool = null;
+    return ok;
+  }
+  dispose() {
+    this.pool?.dispose();
+    this.pool = null;
+  }
+  poolInfo(): PoolInfo {
+    return this.pool?.info ?? { cores: 1, parallel: false, reason: "单线程" };
+  }
+  setThreads(n: number): string {
+    if (n <= 1) {
+      this.pool?.dispose();
+      this.pool = null;
+      return "单线程（配对在主线程上跑）";
+    }
+    if (this.pool) return this.pool.setThreads(n);
+    if (!this.spawn) return "这个页面拿不到 SharedArrayBuffer，只能用单线程";
+    try {
+      const p = this.spawn(n);
+      if (!p) return "这个页面拿不到 SharedArrayBuffer，只能用单线程";
+      this.pool = p;
+      return p.info.reason;
+    } catch (e) {
+      return "并行启动失败：" + (e as Error).message;
+    }
+  }
+  get epoch() {
+    return this.z.epoch;
+  }
+  stepSync() {
+    this.z.step();
+  }
+  reset(seed?: number) {
+    this.z.reset(seed);
+  }
+  bytes() {
+    return this.z.soup;
+  }
+  cellBytes(c: number) {
+    return this.z.cellBytes(c);
+  }
+  paint(c: number, b: Uint8Array) {
+    this.z.paint(c, b);
+  }
+  configure(o: { noise?: number; steps?: number }) {
+    if (o.noise !== undefined) this.z.noise = o.noise;
+    if (o.steps !== undefined) this.z.steps = o.steps;
+  }
+
+  stats(): Stat[] {
+    const s = this.z.stats();
+    const writes = this.z.writes.reduce((a, b) => a + b, 0);
+    return [
+      { label: "熵", value: s.entropy.toFixed(2), hint: "比特 / 字节" },
+      { label: "0x00", value: (s.zeros * 100).toFixed(1) + "%", hint: "空操作占比" },
+      {
+        label: "最常见",
+        value: `0x${s.topByte.toString(16).padStart(2, "0")}`,
+        hint: `${(s.topShare * 100).toFixed(1)}% 的字节`,
+      },
+      { label: "写入", value: String(writes), hint: "本轮内存写次数" },
+    ];
+  }
+  chart(): ChartPoint {
+    const s = this.z.stats();
+    return { primary: s.topShare, secondary: s.entropy / 8 };
+  }
+  chartLabels(): [string, string] {
+    return ["最常见字节占比", "熵 / 8"];
+  }
+
+  listing(c: number): Listing[] {
+    const bytes = this.cellBytes(c);
+    const out: Listing[] = [];
+    let i = 0;
+    while (i < bytes.length) {
+      const b = bytes[i];
+      const len = Math.min(instrLen(b), bytes.length - i);
+      // the two-byte ED prefix carries the block instructions
+      const text = asmText(b, bytes[i + 1]);
+      out.push({ offset: i, value: b, text: len > 1 ? `${text} (${len} 字节)` : text });
+      i += len;
+    }
+    return out;
+  }
+
+  blocks(c: number): Block[] {
+    const bytes = this.cellBytes(c);
+    const out: Block[] = [];
+    let i = 0;
+    while (i < CELL) {
+      const b = bytes[i];
+      const len = Math.min(instrLen(b), CELL - i);
+      out.push({ start: i, len, short: shortAsm(b) });
+      i += len;
+    }
+    return out;
+  }
+
+  microscope(c: number): Microscope | null {
+    if (!this.scopeCore) return null;
+    return new Z80Microscope(this.scopeCore, this.cellBytes(c), this.cellBytes((c + 1) % this.n));
+  }
+
+  cellKey(c: number, mode: CellMode): number {
+    const b = this.cellBytes(c);
+    if (mode === "content") {
+      let h = 0x811c9dc5;
+      for (let i = 0; i < CELL; i++) h = Math.imul(h ^ b[i], 0x01000193);
+      return (h >>> 24) & 0xff;
+    }
+    if (mode === "lineage") {
+      return (Math.imul(b[0] + (b[1] << 8), 2654435761) >>> 26) & 0x3f;
+    }
+    const counts = new Uint8Array(5);
+    for (let i = 0; i < CELL; i++) counts[Z80_CLASS[b[i]]]++;
+    let best = 0;
+    for (let k = 1; k < 5; k++) if (counts[k] > counts[best]) best = k;
+    return best;
+  }
+}
+
+export function createZ80(
+  z: Z80World,
+  pool: PairPool | null = null,
+  spawn: ((n: number) => PairPool | null) | null = null,
+  scopeCore: Z80Core | null = null,
+): Z80Substrate {
+  return new Z80Substrate(z, pool, spawn, scopeCore);
+}
+
+export { Z80_STEPS };

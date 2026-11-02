@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#262624" />
+    <title>计算生命 · Z80</title>
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1>计算生命</h1>
+        <span class="sub">从随机噪声里长出的自我复制子 · arXiv:2406.19108</span>
+        <span class="spacer"></span>
+        <span class="readout"><b id="epoch">0</b> 轮</span>
+        <span class="readout" id="rate">— 轮/秒</span>
+        <span class="readout" id="mode" title="">—</span>
+        <button id="panels" title="收起侧栏">⟩</button>
+        <button id="play" class="primary">暂停</button>
+      </header>
+
+      <main>
+        <div id="stage">
+          <canvas id="grid"></canvas>
+          <div id="hint">点格子查看它 · 空格键暂停</div>
+        </div>
+
+        <aside>
+          <section class="card">
+            <h2>汤</h2>
+            <div class="stats" id="stats"></div>
+            <canvas id="chart"></canvas>
+            <div class="chart-legend">
+              <span><i style="background: #b9705a"></i><b id="lg-primary-name">—</b> <b id="lg-primary">—</b></span>
+              <span><i style="background: #8a8f7d"></i><b id="lg-secondary-name">—</b> <b id="lg-secondary">—</b></span>
+            </div>
+          </section>
+
+          <section class="card">
+            <h2>世界</h2>
+            <div class="row">
+              <label>速度</label>
+              <input id="speed" type="range" min="0" max="64" value="24" />
+              <output id="speed-v">16</output>
+            </div>
+            <div class="row">
+              <label>突变率</label>
+              <input id="mutation" type="range" min="0" max="8" value="3" />
+              <output id="mutation-v">1/16</output>
+            </div>
+            <div class="row">
+              <label>代码密度</label>
+              <input id="density" type="range" min="0" max="6" value="0" />
+              <output id="density-v">3.9%</output>
+            </div>
+            <div class="row">
+              <label>步数上限</label>
+              <input id="steps" type="range" min="6" max="13" value="13" />
+              <output id="steps-v">8192</output>
+            </div>
+            <div class="row">
+              <label>邻居半径</label>
+              <input id="radius" type="range" min="0" max="4" value="2" />
+              <output id="radius-v">2</output>
+            </div>
+            <div class="row">
+              <label>地图</label>
+              <select id="mapsize"></select>
+            </div>
+            <div class="row">
+              <label>线程</label>
+              <select id="threads"></select>
+            </div>
+            <div id="threads-note" class="state"></div>
+            <div class="row">
+              <label>显示</label>
+              <select id="display">
+                <option value="bytes:8">字节 8×8 · 1 字节/格</option>
+                <option value="bytes:4" selected>字节 4×4 · 4 字节/格</option>
+                <option value="bytes:2">字节 2×2 · 16 字节/格</option>
+                <option value="cell:code">整格 · 指令类型</option>
+                <option value="cell:content">整格 · 内容相同</option>
+                <option value="cell:lineage">整格 · 血统</option>
+              </select>
+            </div>
+            <div class="row">
+              <label>配色</label>
+              <select id="theme">
+                <option value="dark" selected>暗色</option>
+                <option value="light">亮色（原作）</option>
+              </select>
+              <button id="reset">重置</button>
+            </div>
+          </section>
+
+          <section class="card">
+            <h2>显微镜 <small id="lab-cell">— 未选中格子</small></h2>
+            <div class="row tight">
+              <button id="preset">种下复制子</button>
+              <button id="paint">写入世界</button>
+            </div>
+            <textarea id="prog" spellcheck="false" rows="4"
+              placeholder="64 字节的 BFF 程序。指令 [ ] + - . , &lt; &gt; { }，· 表示 0x00，# 表示 0x01"></textarea>
+            <div class="row tight">
+              <button id="lab-run" class="primary">▶ 运行</button>
+              <button id="step" title="按“每帧步数”前进">单步 ×4</button>
+              <button id="swap" title="A+B 与 B+A 是两次不同的反应，只有前半段从 pc=0 开始">⇄ 交换</button>
+              <button id="lab-reset">重载</button>
+            </div>
+            <div class="row tight">
+              <label class="auto">每帧步数</label>
+              <select id="labspeed" class="w-sm">
+                <option>1</option><option selected>4</option><option>16</option><option>64</option>
+              </select>
+              <label class="auto">粒度</label>
+              <select id="labgrid" class="w-md">
+                <option value="8" selected>8×8 · 1 字节</option>
+                <option value="4">4×4 · 4 字节</option>
+              </select>
+            </div>
+            <canvas id="lab"></canvas>
+            <canvas id="trace"></canvas>
+            <div class="row tight" id="lab-scrub">
+              <label class="auto">跑到第</label>
+              <input id="labstep" type="range" min="0" max="128" value="0" />
+              <output id="labstep-v">0</output>
+              <label class="auto">步</label>
+            </div>
+            <pre id="lab-list" class="lablist">—</pre>
+            <div id="lab-state" class="state">—</div>
+            <div class="legend" id="legend"></div>
+            <p class="note" id="lab-note">—</p>
+          </section>
+        </aside>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

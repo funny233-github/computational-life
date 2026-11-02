@@ -1,0 +1,686 @@
+/* ------------------------------------------------------------------ *
+ * Material You (Material 3) — dark scheme, seeded from a mint/emerald
+ * primary so the chrome sits next to the soup's own pixel colours
+ * without competing with them.
+ * ------------------------------------------------------------------ */
+
+:root {
+  /* Claude's warm neutrals, not a blue-grey IDE theme: everything sits on a
+     slightly warm charcoal and the only saturated colour is the terracotta
+     accent, so long sessions do not glow at you. */
+  --bg: #262624;
+  --bg-deep: #1f1e1d;
+  --card: #30302e;
+  --chip: #3a3a37;
+  --hover: #44443f;
+  --text: #e6e3dc;
+  --text-dim: #c2c0b6;
+  --muted: #8e8c82;
+  --accent: #c07a5f;
+  --accent-press: #a5654c;
+  --line: #3f3f3a;
+
+  /* aliases so the rules below stay readable */
+  --primary: var(--accent);
+  --on-primary: #f2e6df;
+  --primary-container: #3a2f28;
+  --on-primary-container: #eec8b6;
+  --secondary-container: var(--chip);
+  --on-secondary-container: var(--text);
+  --surface-dim: var(--bg-deep);
+  --surface-1: var(--card);
+  --surface-2: var(--chip);
+  --surface-3: var(--hover);
+  --surface-4: #44443f;
+  --on-surface: var(--text);
+  --on-surface-variant: var(--text-dim);
+  --outline: #6b6a60;
+  --outline-variant: #3f3f3a;
+
+  /* type */
+  --font: "Styrene B", Inter, system-ui, -apple-system, "Noto Sans SC",
+    "PingFang SC", "Microsoft YaHei", sans-serif;
+  --serif: "Tiempos Text", "Copernicus", Georgia, "Songti SC", "Noto Serif SC", serif;
+  --mono: "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* shape */
+  --r-xl: 22px;
+  --r-lg: 16px;
+  --r-md: 12px;
+  --r-sm: 8px;
+  --r-full: 999px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--surface-dim);
+  color: var(--on-surface);
+  font: 400 13px/1.45 var(--font);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* ---------------------------------------------------------- top app bar */
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 64px;
+  flex: none;
+  padding: 0 20px;
+  background: var(--surface-2);
+}
+
+h1 {
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 500;
+  margin: 0;
+  letter-spacing: 0.01em;
+  color: var(--on-surface);
+}
+
+.sub {
+  color: var(--on-surface-variant);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+h1 {
+  flex: none;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.readout {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--r-full);
+  background: var(--surface-4);
+  color: var(--on-surface-variant);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.readout b {
+  color: var(--on-surface);
+  font-weight: 500;
+}
+
+#mode {
+  background: var(--primary-container);
+  color: var(--on-primary-container);
+  font-weight: 500;
+}
+
+/* ------------------------------------------------------------- layout */
+
+main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 392px;
+  min-height: 0;
+  transition: grid-template-columns 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+#stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface-dim);
+}
+
+#grid {
+  image-rendering: pixelated;
+  cursor: crosshair;
+  border-radius: var(--r-lg);
+  box-shadow: 0 0 0 1px var(--outline-variant);
+}
+
+#hint {
+  position: absolute;
+  bottom: 26px;
+  right: 30px;
+  padding: 6px 14px;
+  border-radius: var(--r-full);
+  background: var(--surface-3);
+  color: var(--on-surface-variant);
+  font-size: 12px;
+  pointer-events: none;
+  opacity: 0.92;
+}
+
+/* --------------------------------------------------------- side panel */
+
+body.hide-aside main {
+  grid-template-columns: 1fr 0;
+}
+
+body.hide-aside aside {
+  display: none;
+}
+
+aside {
+  background: var(--surface-dim);
+  overflow-y: auto;
+  padding: 4px 16px 28px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--outline-variant) transparent;
+}
+
+aside::-webkit-scrollbar {
+  width: 8px;
+}
+
+aside::-webkit-scrollbar-thumb {
+  background: var(--outline-variant);
+  border-radius: var(--r-full);
+}
+
+section.card {
+  background: var(--surface-1);
+  border-radius: var(--r-xl);
+  padding: 18px;
+  margin: 12px 0;
+}
+
+h2 {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--on-surface-variant);
+  margin: 0 0 14px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+h2 small {
+  letter-spacing: 0;
+  color: var(--outline);
+  font-weight: 400;
+  font-size: 12px;
+}
+
+/* --------------------------------------------------------------- stats */
+
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+}
+
+.stats label {
+  color: var(--on-surface-variant);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.stats b {
+  font: 500 19px/1.2 var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: #d3a08b;
+  letter-spacing: -0.01em;
+}
+
+.stats small {
+  color: var(--outline);
+  font-size: 10px;
+}
+
+#chart {
+  width: 100%;
+  height: 92px;
+  display: block;
+  background: var(--surface-1);
+  border-radius: var(--r-md);
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--on-surface-variant);
+}
+
+.chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chart-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.chart-legend b {
+  color: var(--on-surface);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------- rows */
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.row:last-child {
+  margin-bottom: 0;
+}
+
+.row.tight {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.row.tight button {
+  flex: 1 1 auto;
+  padding: 8px 10px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row label {
+  width: 72px;
+  color: var(--on-surface-variant);
+  font-size: 12px;
+  flex: none;
+}
+
+.row label.auto {
+  width: auto;
+}
+
+.row output {
+  width: 58px;
+  text-align: right;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--on-surface);
+  font-size: 12px;
+  flex: none;
+}
+
+/* -------------------------------------------------------------- sliders */
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1;
+  min-width: 0;
+  height: 20px;
+  background: transparent;
+  --p: 0%;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: var(--r-full);
+  background: linear-gradient(
+    to right,
+    var(--primary) var(--p),
+    var(--outline-variant) var(--p)
+  );
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 3px solid var(--surface-1);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: var(--r-full);
+  background: var(--outline-variant);
+}
+
+input[type="range"]::-moz-range-progress {
+  height: 4px;
+  border-radius: var(--r-full);
+  background: var(--primary);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 3px solid var(--surface-1);
+}
+
+input[type="range"]:focus-visible {
+  outline: none;
+}
+
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--primary) 24%, transparent);
+}
+
+/* ------------------------------------------------------------- controls */
+
+select {
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--surface-4);
+  color: var(--on-surface);
+  border: none;
+  border-radius: var(--r-md);
+  padding: 8px 30px 8px 12px;
+  font: 400 12px var(--font);
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--on-surface-variant) 50%),
+    linear-gradient(135deg, var(--on-surface-variant) 50%, transparent 50%);
+  background-position:
+    calc(100% - 15px) calc(50% - 1px),
+    calc(100% - 10px) calc(50% - 1px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  transition: background-color 0.15s;
+}
+
+select:hover {
+  background-color: color-mix(in srgb, var(--surface-4) 88%, var(--on-surface));
+}
+
+select:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+select option {
+  background: var(--surface-2);
+  color: var(--on-surface);
+}
+
+button {
+  border: none;
+  border-radius: var(--r-full);
+  padding: 8px 18px;
+  background: var(--secondary-container);
+  color: var(--on-secondary-container);
+  font: 500 12px/1.35 var(--font);
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s, box-shadow 0.15s;
+}
+
+button:hover {
+  background: color-mix(in srgb, var(--secondary-container) 88%, var(--secondary));
+}
+
+button:active {
+  background: color-mix(in srgb, var(--secondary-container) 80%, var(--secondary));
+}
+
+button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+button.primary {
+  background: #8d5641;
+  color: #f2e6df;
+  min-width: 84px;
+  font-weight: 500;
+}
+
+button.primary:hover {
+  background: #9b5f48;
+}
+
+button.primary:active {
+  background: #7d4b39;
+}
+
+/* ------------------------------------------------------------- textarea */
+
+textarea {
+  width: 100%;
+  resize: vertical;
+  background: var(--surface-2);
+  color: var(--on-surface);
+  border: none;
+  border-bottom: 1px solid var(--outline);
+  border-radius: var(--r-md) var(--r-md) 4px 4px;
+  padding: 10px 12px;
+  font: 400 12px/1.6 var(--mono);
+  letter-spacing: 0.1em;
+  margin: 2px 0 12px;
+  word-break: break-all;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+textarea::placeholder {
+  color: var(--outline);
+  letter-spacing: 0;
+}
+
+textarea:hover {
+  background: var(--surface-3);
+}
+
+textarea:focus {
+  outline: none;
+  background: var(--surface-3);
+  border-bottom: 2px solid var(--primary);
+  padding-bottom: 9px;
+}
+
+/* ---------------------------------------------------------- microscope */
+
+#lab {
+  display: block;
+  margin-top: 10px;
+  border-radius: var(--r-md);
+}
+
+.lablist {
+  margin: 10px 0 0;
+  font: 400 10.5px/1.6 var(--mono);
+  color: var(--on-surface-variant);
+  white-space: pre;
+  overflow: hidden;
+  background: var(--surface-2);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+}
+
+.state.warn {
+  color: var(--primary);
+}
+
+.state {
+  margin-top: 8px;
+  font: 400 10.5px var(--mono);
+  color: var(--outline);
+  font-variant-numeric: tabular-nums;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 10px;
+  font-size: 10px;
+  color: var(--on-surface-variant);
+}
+
+.legend .k {
+  display: inline-flex;
+  align-items: center;
+}
+
+.legend .k::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 5px;
+  border-radius: 3px;
+}
+
+.legend .pc::before {
+  background: #1d4ed8;
+}
+
+.legend .h0::before {
+  background: #0e7490;
+}
+
+.legend .h1::before {
+  background: #b91c1c;
+}
+
+/* notation entries have no swatch */
+.legend .t::before {
+  display: none;
+}
+
+.legend .t {
+  color: var(--on-surface-variant);
+}
+
+.legend .t b {
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--on-surface);
+}
+
+/* Z80 byte colours, straight from palette.ts */
+.legend .pcz::before {
+  background: #f5f4ef;
+}
+
+.legend .b00::before {
+  background: #161513;
+}
+
+.legend .b01::before {
+  background: #b06a4f;
+}
+
+.legend .b11::before {
+  background: #7e8f66;
+}
+
+.legend .b21::before {
+  background: #6a7d99;
+}
+
+.legend .bed::before {
+  background: #9b564a;
+}
+
+.legend .ramp::before {
+  background: linear-gradient(90deg, #221f1c, #8e8779);
+}
+
+.legend .cls1::before {
+  background: #2f9e6e;
+}
+
+.legend .cls2::before {
+  background: #c2547a;
+}
+
+.legend .cls3::before {
+  background: #8b6ec2;
+}
+
+.legend .cls4::before {
+  background: #a83a2a;
+}
+
+.legend .data::before {
+  background: #2b3038;
+}
+
+.note {
+  color: var(--outline);
+  font-size: 11px;
+  line-height: 1.62;
+  margin: 12px 0 0;
+}
+
+.note i {
+  color: var(--on-surface-variant);
+  font-style: normal;
+}
+
+.note b {
+  color: var(--on-surface-variant);
+  font-weight: 500;
+}
+
+/* old markup kept harmless */
+.tape {
+  display: none;
+}
+
+.w-sm {
+  width: 62px;
+  flex: none;
+}
+
+.w-md {
+  width: 118px;
+  flex: none;
+}
