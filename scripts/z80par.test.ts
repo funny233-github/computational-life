@@ -62,3 +62,36 @@ if (d2 !== 0) {
   process.exit(1);
 }
 console.log("z80 one-slice path == serial");
+
+// A big map plans 5000-8000 pairs per epoch, but the reference's write_count
+// buffer is only half as big as memoryWrite() indexes it, so a single wasm run
+// traps ("memory access out of bounds"). runPairs has to chunk, and chunking
+// must not change the result — nor may it disagree with a 2-way split.
+{
+  const bigBase = { w: 192, h: 108, seed: 7, noise: 1 / 16, steps: Z80_STEPS };
+  const bigSerial = new Z80World(await loadZ80(), bigBase);
+  const bigPar = new Z80World(null, { ...bigBase, buffer: new SharedArrayBuffer(Z80World.bufferSize(bigBase.w * bigBase.h)) });
+  const bigPlan = new Int32Array(8192 * 2);
+  const cores = [await loadZ80(), await loadZ80()];
+  let maxPairs = 0;
+  for (let e = 0; e < 6; e++) {
+    bigSerial.step();
+    const n = bigPar.planInto(bigPlan);
+    maxPairs = Math.max(maxPairs, n);
+    const half = Math.ceil(n / 2);
+    runPairs(cores[0], bigPar.soup, bigPlan, 0, half, Z80_STEPS, bigPar.writes);
+    runPairs(cores[1], bigPar.soup, bigPlan, half, n, Z80_STEPS, bigPar.writes);
+    bigPar.finishEpoch(n);
+  }
+  let d = 0;
+  for (let i = 0; i < bigSerial.soup.length; i++) if (bigSerial.soup[i] !== bigPar.soup[i]) d++;
+  if (maxPairs <= 4096) {
+    console.error(`FAIL: the big map only planned ${maxPairs} pairs, the chunking path was not exercised`);
+    process.exit(1);
+  }
+  if (d !== 0) {
+    console.error(`FAIL: big map split differs from serial in ${d} bytes`);
+    process.exit(1);
+  }
+  console.log(`z80 big map (192x108, up to ${maxPairs} pairs/epoch) runs in chunks, joins cleanly`);
+}

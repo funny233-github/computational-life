@@ -25,6 +25,26 @@ export function runPairs(
   steps: number,
   writes: Int32Array | null,
 ) {
+  // The reference's `write_count` buffer has MAX_BATCH_PAIR_N entries but
+  // memoryWrite() indexes it as `pair_idx*2 + ...`, so only half of it is
+  // usable; past that the wasm spills out of its data segment and traps with
+  // "memory access out of bounds" (a big map plans 7000+ pairs per epoch).
+  // Pairs are independent, so running them in chunks gives the same result.
+  const cap = Math.max(1, Math.floor(core.writeCount.length / 2));
+  for (let p = p0; p < p1; p += cap) {
+    runChunk(core, soup, idx, p, Math.min(p1, p + cap), steps, writes);
+  }
+}
+
+function runChunk(
+  core: Z80Core,
+  soup: Uint8Array,
+  idx: Int32Array,
+  p0: number,
+  p1: number,
+  steps: number,
+  writes: Int32Array | null,
+) {
   const n = p1 - p0;
   const batch = core.batch;
   for (let p = p0; p < p1; p++) {

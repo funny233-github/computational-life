@@ -557,23 +557,61 @@ textarea:focus {
 /* the card holds three groups: colours, notation, and how-to-read */
 #legend {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   margin-top: 14px;
 }
 
 .cap {
-  margin: 0 0 5px;
+  margin: 0 0 6px;
   font-size: 10px;
   letter-spacing: 0.08em;
   color: var(--outline);
 }
 
+/* one item per line: symbol on the left, meaning on the right */
+.kv {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  color: var(--on-surface-variant);
+}
+
+.kv li {
+  display: grid;
+  grid-template-columns: 5.6em 1fr;
+  align-items: center;
+  gap: 10px;
+  min-height: 18px;
+}
+
+.kv b {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--on-surface);
+  white-space: nowrap;
+}
+
+/* a compact swatch row, used under the access map */
 .legend {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 5px 12px;
   font-size: 10px;
   color: var(--on-surface-variant);
+}
+
+.k::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  vertical-align: middle;
 }
 
 .legend .k {
@@ -583,104 +621,83 @@ textarea:focus {
   white-space: nowrap;
 }
 
-.legend .k::before {
-  content: "";
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 3px;
+/* entries without a swatch */
+.k.t::before,
+.k.tt::before {
+  display: none;
 }
 
-.legend .pc::before {
+.k.pc::before {
   background: #1d4ed8;
 }
 
-.legend .h0::before {
+.k.h0::before {
   background: #0e7490;
 }
 
-.legend .h1::before {
+.k.h1::before {
   background: #b91c1c;
 }
 
-/* notation entries have no swatch */
-.legend .t::before {
-  display: none;
-}
-
-.legend .t {
-  color: var(--on-surface-variant);
-}
-
-.legend .t b {
-  font-family: var(--mono);
-  font-weight: 600;
-  color: var(--on-surface);
-}
-
 /* the access map under the byte grids */
-.legend .tw::before {
+.k.tw::before {
   background: rgba(217, 119, 87, 0.85);
 }
 
-.legend .tr::before {
+.k.tr::before {
   background: rgba(125, 138, 153, 0.7);
 }
 
-.legend .tp::before {
+.k.tp::before {
   background: rgba(255, 255, 255, 0.14);
 }
 
-.legend .tt::before {
-  display: none;
-}
-
 /* Z80 byte colours, straight from palette.ts */
-.legend .pcz::before {
+.k.pcz::before {
   background: #f5f4ef;
 }
 
-.legend .b00::before {
+.k.b00::before {
   background: #161513;
 }
 
-.legend .b01::before {
+.k.b01::before {
   background: #b06a4f;
 }
 
-.legend .b11::before {
+.k.b11::before {
   background: #7e8f66;
 }
 
-.legend .b21::before {
+.k.b21::before {
   background: #6a7d99;
 }
 
-.legend .bed::before {
+.k.bed::before {
   background: #9b564a;
 }
 
-.legend .ramp::before {
+.k.ramp::before {
   background: linear-gradient(90deg, #221f1c, #8e8779);
 }
 
-.legend .cls1::before {
+.k.cls1::before {
   background: #2f9e6e;
 }
 
-.legend .cls2::before {
+.k.cls2::before {
   background: #c2547a;
 }
 
-.legend .cls3::before {
+.k.cls3::before {
   background: #8b6ec2;
 }
 
-.legend .cls4::before {
+.k.cls4::before {
   background: #a83a2a;
 }
 
-.legend .data::before {
+.k.data::before {
   background: #2b3038;
 }
 

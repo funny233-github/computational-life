@@ -136,33 +136,38 @@ function buildLegend(kind: "z80" | "bff") {
   const box = $("legend");
   box.textContent = "";
 
+  /** a caption plus a one-item-per-line list */
   const group = (caption: string): HTMLElement => {
     const wrap = document.createElement("section");
     wrap.className = "legend-group";
     const cap = document.createElement("p");
     cap.className = "cap";
     cap.textContent = caption;
-    wrap.append(cap);
-    const row = document.createElement("div");
-    row.className = "legend";
-    wrap.append(row);
+    const list = document.createElement("ul");
+    list.className = "kv";
+    wrap.append(cap, list);
     box.append(wrap);
-    return row;
+    return list;
   };
 
   /** a colour swatch, or (for the notation) a coded symbol, plus its label */
-  const item = (row: HTMLElement, cls: string, text: string, code?: string) => {
-    const el = document.createElement("span");
-    el.className = `k ${cls}`;
+  const item = (list: HTMLElement, cls: string, text: string, code?: string) => {
+    const li = document.createElement("li");
+    li.className = `k ${cls}`;
     if (code) {
       const b = document.createElement("b");
       b.textContent = code;
-      el.append(b, " " + text);
-    } else el.textContent = text;
-    row.append(el);
+      const span = document.createElement("span");
+      span.textContent = text;
+      li.append(b, span);
+    } else {
+      const span = document.createElement("span");
+      span.textContent = text;
+      li.append(span);
+    }
+    list.append(li);
   };
 
-  /** the explainer: one short sentence per line, nothing wraps */
   const lines = (entries: string[]) => {
     const list = $<HTMLUListElement>("lab-note");
     list.textContent = "";
