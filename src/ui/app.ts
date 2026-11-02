@@ -5,7 +5,7 @@
 import type { Substrate, Microscope } from "../engine/index.ts";
 import { createSubstrate } from "../engine/factory.ts";
 import { decode, encode, GRID_LEGEND, maxCores, opChar, TAPE } from "../engine/index.ts";
-import { setTheme, type ViewMode } from "./palette.ts";
+import { byteColors, setTheme, type ViewMode } from "./palette.ts";
 import type { Series } from "./chart.ts";
 import { SoupCanvas } from "./canvas.ts";
 import { drawChart } from "./chart.ts";
@@ -251,6 +251,7 @@ function drawLabNow() {
     $("lab-scrub").style.display = "";
     if (!scope || !scope.tape) return;
     drawBytePair(labCanvas, scope.tape, scope.pc, 4, "A 本格", "B 右邻");
+    showInsight();
     if (scope.trace) drawTrace(traceCanvas, scope.trace, scope.steps ?? 0, scope.maxSteps ?? 128);
     const step = $<HTMLInputElement>("labstep");
     step.max = String(scope.maxSteps ?? 128);
@@ -273,6 +274,65 @@ function drawLabNow() {
     `${labTotal.toLocaleString()} 步  ·  每帧 ×${labSpeed}` +
     (off ? "  ·  已跑出纸带" : "") +
     `  —  pc ${off ? "—" : scope.pc} ${cmd}  h0 ${scope.h0 & 127}  h1 ${scope.h1 & 127}`;
+}
+
+/**
+ * The instruction the pc sits on: the byte's own colour, its grid glyph, the
+ * exact disassembly, the registers it touches (coloured + named), and a
+ * sentence saying what it is about to do.
+ */
+function showInsight() {
+  const box = $("insight");
+  const ins = world?.kind === "z80" ? (scope?.insight?.() ?? null) : null;
+  if (!ins) {
+    box.style.display = "none";
+    return;
+  }
+  box.style.display = "";
+
+  const regs = scope?.registers?.() ?? null;
+  const byte = ins.code;
+  const col = byteColors("z80")[byte];
+  const rgb = `rgb(${col & 255},${(col >> 8) & 255},${(col >> 16) & 255})`;
+  const light = ((col & 255) + ((col >> 8) & 255) + ((col >> 16) & 255)) / 3 > 105;
+
+  const chip = $("i-byte");
+  chip.textContent = byte.toString(16).padStart(2, "0");
+  chip.style.background = rgb;
+  chip.style.color = light ? "#1b1a18" : "#e6e3dc";
+  $("i-glyph").textContent = ins.glyph;
+  $("i-asm").textContent = ins.asm;
+  $("i-family").textContent = ins.family;
+
+  // registers: name + value, coloured by which register it is
+  const host = $("i-regs");
+  host.textContent = "";
+  for (const r of regs ?? []) {
+    const el = document.createElement("span");
+    const used = ins.writes.includes(r.name) ? " w" : ins.reads.includes(r.name) ? " r" : "";
+    el.className = `reg rg-${r.name.toLowerCase()}${used}`;
+    const n = document.createElement("b");
+    n.textContent = r.name;
+    const v = document.createElement("i");
+    v.textContent = r.value;
+    el.append(n, v);
+    host.append(el);
+  }
+
+  // the flag bits, so a conditional jump stops being a mystery
+  const fEl = $("i-flags");
+  fEl.textContent = "";
+  const fv = parseInt((regs ?? []).find((r) => r.name === "F")?.value ?? "0x0", 16);
+  const bits: [string, number][] = [["S", 7], ["Z", 6], ["H", 4], ["P", 2], ["N", 1], ["C", 0]];
+  for (const [name, bit] of bits) {
+    const b = document.createElement("b");
+    b.textContent = name;
+    if ((fv >> bit) & 1) b.className = "on";
+    fEl.append(b);
+  }
+
+  $("i-text").textContent = ins.text;
+  $("i-effect").textContent = ins.effect;
 }
 
 function loadLab() {

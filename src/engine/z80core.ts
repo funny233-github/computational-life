@@ -1,5 +1,63 @@
 import { Z80_WASM_B64 } from "./z80wasm.ts";
 
+/**
+ * Byte offsets inside the `z80` struct the wasm hands us (see the reference's
+ * external/z80.h): five pointers (20 bytes), `unsigned long cyc` (4), then the
+ * registers. `z80_trace` is the only entry point that leaves the struct behind.
+ */
+export const Z80_STATE = {
+  cyc: 20,
+  pc: 24,
+  sp: 26,
+  ix: 28,
+  iy: 30,
+  a: 34,
+  b: 35,
+  c: 36,
+  d: 37,
+  e: 38,
+  h: 39,
+  l: 40,
+  /** flags packed low-to-high: S Z Y H X P N C */
+  flags: 51,
+} as const;
+
+export interface Registers {
+  a: number;
+  b: number;
+  c: number;
+  d: number;
+  e: number;
+  h: number;
+  l: number;
+  /** the F register, rebuilt from the bitfield */
+  f: number;
+  pc: number;
+  sp: number;
+  ix: number;
+  iy: number;
+}
+
+/** read the register file the last `trace()` left in wasm memory */
+export function readRegisters(core: Z80Core): Registers {
+  const s = core.state;
+  const u16 = (o: number) => s[o] | (s[o + 1] << 8);
+  return {
+    a: s[Z80_STATE.a],
+    b: s[Z80_STATE.b],
+    c: s[Z80_STATE.c],
+    d: s[Z80_STATE.d],
+    e: s[Z80_STATE.e],
+    h: s[Z80_STATE.h],
+    l: s[Z80_STATE.l],
+    f: s[Z80_STATE.flags],
+    pc: u16(Z80_STATE.pc),
+    sp: u16(Z80_STATE.sp),
+    ix: u16(Z80_STATE.ix),
+    iy: u16(Z80_STATE.iy),
+  };
+}
+
 export const Z80_TAPE = 16;
 export const Z80_PAIR = 32;
 /** the reference lab runs this many Z80 instructions per interaction */

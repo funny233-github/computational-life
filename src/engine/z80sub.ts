@@ -1,7 +1,19 @@
-import type { Block, CellMode, ChartPoint, Listing, Microscope, PairPool, PoolInfo, Stat, Substrate } from "./substrate.ts";
-import { Z80_PAIR, Z80_STEPS, Z80_TAPE, type Z80Core } from "./z80core.ts";
+import type {
+  Block,
+  CellMode,
+  ChartPoint,
+  Insight,
+  Listing,
+  Microscope,
+  PairPool,
+  PoolInfo,
+  Stat,
+  Substrate,
+} from "./substrate.ts";
+import { Z80_PAIR, Z80_STEPS, Z80_TAPE, readRegisters, type Z80Core } from "./z80core.ts";
 import { Z80World } from "./z80soup.ts";
 import { BYTE2ASM, ED_NAME } from "./z80disasm.ts";
+import { describe } from "./z80desc.ts";
 
 /** how many bytes the instruction starting at `b` occupies */
 export function instrLen(b: number): number {
@@ -163,6 +175,37 @@ export class Z80Microscope implements Microscope {
     this.pc = st[24] | (st[25] << 8);
     this.sp = st[26] | (st[27] << 8);
     this.writes = this.core.writeCount[0] + this.core.writeCount[1];
+  }
+
+  /** the eight main registers, the stack/pointer pair, and the byte at (HL) */
+  registers(): { name: string; value: string }[] {
+    const r = readRegisters(this.core);
+    const hex = (v: number, w: number) => `0x${v.toString(16).padStart(w, "0")}`;
+    const hl = (r.h << 8) | r.l;
+    return [
+      { name: "A", value: hex(r.a, 2) },
+      { name: "F", value: hex(r.f, 2) },
+      { name: "B", value: hex(r.b, 2) },
+      { name: "C", value: hex(r.c, 2) },
+      { name: "D", value: hex(r.d, 2) },
+      { name: "E", value: hex(r.e, 2) },
+      { name: "H", value: hex(r.h, 2) },
+      { name: "L", value: hex(r.l, 2) },
+      { name: "(HL)", value: hex(this.tape[hl & 31], 2) },
+      { name: "SP", value: hex(r.sp, 4) },
+      { name: "PC", value: hex(r.pc, 4) },
+    ];
+  }
+
+  /** what the instruction under pc is about to do, with live values */
+  insight(): Insight {
+    const r = readRegisters(this.core);
+    const at = r.pc & 31;
+    const next = this.tape[(at + 1) & 31];
+    return {
+      ...describe(this.tape[at], next, r, this.tape),
+      glyph: shortAsm(this.tape[at], next),
+    };
   }
 }
 

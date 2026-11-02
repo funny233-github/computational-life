@@ -35,6 +35,27 @@ export interface Block {
   short: string;
 }
 
+/**
+ * What the instruction under pc is about to do. Plain data: the microscope
+ * panel paints it, the engine only fills in the words.
+ */
+export interface Insight {
+  /** the opcode byte itself */
+  code: number;
+  /** the one-glyph form used on the grid ("±", "nn→HL") */
+  glyph: string;
+  /** exact disassembly ("ADD A,B") */
+  asm: string;
+  family: string;
+  /** register names this instruction reads / writes */
+  reads: string[];
+  writes: string[];
+  /** a sentence: what it will do */
+  text: string;
+  /** what the values become */
+  effect: string;
+}
+
 /** the interactive single-cell stepper shown under the soup */
 export interface Microscope {
   /** the tape as it is after `steps` steps (32 bytes for Z80, 128 for BFF) */
@@ -53,6 +74,10 @@ export interface Microscope {
   step?(): void;
   /** A+B  <->  B+A */
   swap?(): void;
+  /** the instruction the pc sits on, with live values filled in */
+  insight?(): Insight | null;
+  /** the register file as it stands right now */
+  registers?(): { name: string; value: string }[];
 }
 
 /** what the UI is allowed to know about parallelism */

@@ -543,6 +543,153 @@ textarea:focus {
   padding: 10px 12px;
 }
 
+/* ---- the instruction inspector under the byte grids ---- */
+.insight {
+  margin-top: 10px;
+  padding: 10px 11px;
+  border-radius: 12px;
+  background: var(--surface-2, #2b2a28);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.insight .ihead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.insight .ibyte {
+  font: 600 11px var(--mono);
+  padding: 2px 6px;
+  border-radius: 6px;
+  letter-spacing: 0.02em;
+}
+
+.insight .iglyph {
+  font: 600 15px var(--mono);
+  color: var(--on-surface);
+  min-width: 1.4em;
+}
+
+.insight .iasm {
+  font: 500 11.5px var(--mono);
+  color: var(--on-surface);
+}
+
+.insight .ifam {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--outline);
+}
+
+.insight .iregs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 9px;
+}
+
+.insight .reg {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 7px;
+  font: 500 10.5px var(--mono);
+  color: var(--outline);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid transparent;
+}
+
+.insight .reg b {
+  font-weight: 600;
+}
+
+.insight .reg i {
+  font-style: normal;
+  opacity: 0.75;
+}
+
+/* read green-ish, written warm — the same colours the register has in the soup */
+.insight .reg.r {
+  color: var(--on-surface-variant);
+}
+
+.insight .reg.w {
+  color: var(--on-surface);
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  border-color: color-mix(in srgb, currentColor 45%, transparent);
+}
+
+.insight .rg-a b,
+.insight .rg-a i {
+  color: #c99b83;
+}
+
+.insight .rg-f b,
+.insight .rg-f i {
+  color: #9c9a90;
+}
+
+.insight .rg-bc b,
+.insight .rg-bc i {
+  color: #93a4bd;
+}
+
+.insight .rg-de b,
+.insight .rg-de i {
+  color: #a3b48c;
+}
+
+.insight .rg-hl b,
+.insight .rg-hl i {
+  color: #bfa4b3;
+}
+
+.insight .rg-sp b,
+.insight .rg-sp i {
+  color: #c0b9a8;
+}
+
+.insight .rg-pc b,
+.insight .rg-pc i {
+  color: #e2dfd6;
+}
+
+.insight .rg-\(hl\) b,
+.insight .rg-\(hl\) i {
+  color: #b8977f;
+}
+
+.insight .iflags {
+  display: flex;
+  gap: 6px;
+  margin-top: 7px;
+  font: 600 9.5px var(--mono);
+  color: rgba(230, 227, 220, 0.22);
+}
+
+.insight .iflags b {
+  font-weight: 600;
+}
+
+.insight .iflags b.on {
+  color: #c99b83;
+}
+
+.insight .itext,
+.insight .ieffect {
+  margin: 9px 0 0;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--on-surface-variant);
+}
+
+.insight .ieffect {
+  color: var(--outline);
+}
+
 .state.warn {
   color: var(--primary);
 }
