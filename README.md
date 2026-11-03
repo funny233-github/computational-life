@@ -270,7 +270,9 @@ src/main.ts         两行：引入样式和 app
 
 ## 测试
 
-`npm test` = 构建 + 下面全部，任何一条失败都返回非零：
+`npm test` = 类型检查（`src` + `scripts`，配置在 `tsconfig.tests.json`）+ 构建 + 下面全部，
+任何一条失败都返回非零。测试本身是 `.ts` 直接交给 node 的类型剥离，所以单独做类型检查
+是必要的——否则手误只会变成运行时的 `undefined`。
 
 ```
 scripts/layers.test.ts   分层边界：引擎里不许出现 document/window/canvas，
@@ -297,7 +299,8 @@ scripts/smoke.mjs        假 DOM 跑一遍打包产物：运行时错误、控�
 
 ## 托管到 GitHub Pages
 
-仓库里带了 `.github/workflows/pages.yml`：推到 `master` 就自动构建 `dist/` 并发到 Pages。
+仓库里带了 `.github/workflows/pages.yml`：推到 `master` 会先跑一遍 `npm test`，
+通过后才构建 `dist/` 并发到 Pages；`.github/workflows/ci.yml` 在每次 push / PR 上跑同一套。
 第一次要手动去 Settings → Pages → Source 选 **GitHub Actions**，之后每次推都是自动的。
 
 `vite.config.ts` 里的 `base: "./"` 让所有资源走相对路径，
@@ -314,8 +317,9 @@ wasm 和 worker 也是同源直取（Pages 对 `.wasm` 给的是 `application/wa
 
 ## 构建环境
 
-项目本身只有两个普通 devDependency（typescript / vite），
+项目本身只有三个普通 devDependency（typescript / vite / `@types/node`），
 没有任何平台特定的包——rollup 的原生二进制由 npm 按平台自动挑（`optionalDependencies`）。
+Node 版本记在 `.nvmrc`（`engines` 要求 `>=22.18`；测试是把 `.ts` 直接交给 node 跑）。
 
 如果你在 **Alpine / musl 容器**里构建（比如本项目的开发沙箱），npm 可能因为某个已知 bug
 没装上 musl 版 rollup；补装时**不要写进 package.json**：

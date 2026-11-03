@@ -17,14 +17,16 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npm run build
+      # never publish a build the test suite has not passed
+      - run: npm test
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

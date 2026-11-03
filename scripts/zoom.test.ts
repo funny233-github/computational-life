@@ -53,7 +53,6 @@ for (const cell of [4, 6.907, 18.04]) {
 
 // 3. zooming around a point keeps that cell under it, even when ox flips to 0
 {
-  const side = 4;
   const soupW = 96;
   const stageW = 968;
   const oxFor = (cell: number) => Math.max(0, (stageW - soupW * cell) / 2);

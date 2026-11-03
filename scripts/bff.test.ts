@@ -3,7 +3,7 @@
  *    agree exactly — they are two implementations of the same interpreter.
  * 2. the hand-written replicator must still replicate.
  */
-import { Exec, PAIR, TAPE, decode, encode, evalTape } from "../src/engine/bff.ts";
+import { Exec, PAIR, decode, encode, evalTape } from "../src/engine/bff.ts";
 import { REPLICATOR } from "../src/engine/programs.ts";
 import { Soup } from "../src/engine/soup.ts";
 
