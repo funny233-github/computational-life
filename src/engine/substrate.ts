@@ -137,7 +137,20 @@ export interface Substrate {
    */
   cellKey(c: number, mode: CellMode): number;
 
-  configure(o: { noise?: number; steps?: number }): void;
+  /**
+   * Live parameters. `noise`/`steps` apply to the next instruction run,
+   * `radius`/`mixed` to the next plan, `density` only to the next reset
+   * (it seeds the initial bytes). Substrates ignore what they do not have.
+   */
+  configure(o: {
+    noise?: number;
+    steps?: number;
+    /** interaction radius; 0 means "well mixed" (the 0-D soup) */
+    radius?: number;
+    mixed?: boolean;
+    /** probability that an initial byte is an instruction (reset only) */
+    density?: number;
+  }): void;
 
   /** BFF only: an interactive tape for the microscope */
   microscope?(c: number): Microscope | null;

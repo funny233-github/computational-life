@@ -26,6 +26,7 @@
   --primary-container: #3a2f28;
   --on-primary-container: #eec8b6;
   --secondary-container: var(--chip);
+  --secondary: #8a887e;
   --on-secondary-container: var(--text);
   --surface-dim: var(--bg-deep);
   --surface-1: var(--card);
@@ -633,17 +634,29 @@ textarea:focus {
 }
 
 .insight .rg-bc b,
-.insight .rg-bc i {
+.insight .rg-bc i,
+.insight .rg-b b,
+.insight .rg-b i,
+.insight .rg-c b,
+.insight .rg-c i {
   color: #93a4bd;
 }
 
 .insight .rg-de b,
-.insight .rg-de i {
+.insight .rg-de i,
+.insight .rg-d b,
+.insight .rg-d i,
+.insight .rg-e b,
+.insight .rg-e i {
   color: #a3b48c;
 }
 
 .insight .rg-hl b,
-.insight .rg-hl i {
+.insight .rg-hl i,
+.insight .rg-h b,
+.insight .rg-h i,
+.insight .rg-l b,
+.insight .rg-l i {
   color: #bfa4b3;
 }
 

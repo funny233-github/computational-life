@@ -12,6 +12,7 @@
  * messaging layer is a thin shell around this.
  */
 import { Soup, type EpochParams } from "../src/engine/soup.ts";
+import { BffSubstrate } from "../src/engine/bffsub.ts";
 
 let fails = 0;
 const check = (name: string, ok: boolean) => {
@@ -126,6 +127,20 @@ const base = {
   check(`progs match serial after ${EPOCHS} epochs`, hash(main.progs) === hash(serial.progs));
   check(`lineage tokens match serial after ${EPOCHS} epochs`, hash(main.toks) === hash(serial.toks));
   check("epoch counters agree", main.epoch === serial.epoch);
+}
+
+// --------------------------------------------------- live parameters
+{
+  const s = new Soup({ ...base });
+  const sub = new BffSubstrate(s, null);
+  sub.configure({ radius: 0 });
+  check("radius 0 selects the well-mixed soup", s.mixed === true);
+  sub.configure({ radius: 3 });
+  check("radius 3 selects the lattice", s.mixed === false && s.radius === 3);
+  sub.configure({ density: 0.25 });
+  check("density is stored for the next reset", s.density === 0.25);
+  sub.configure({ steps: 64 });
+  check("steps applies live", s.steps === 64);
 }
 
 if (fails) {

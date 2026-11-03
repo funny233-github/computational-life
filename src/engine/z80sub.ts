@@ -272,9 +272,14 @@ export class Z80Substrate implements Substrate {
   }
   setThreads(n: number): string {
     if (n <= 1) {
-      this.pool?.dispose();
-      this.pool = null;
-      return "单线程（配对在主线程上跑）";
+      const pool = this.pool;
+      if (!pool) return "单线程（配对在主线程上跑）";
+      // same rule as BFF: let the current epoch finish before the teardown
+      void this.runExclusive(() => {
+        pool.dispose();
+        if (this.pool === pool) this.pool = null;
+      });
+      return "单线程（正在切换）";
     }
     if (this.pool) return this.pool.setThreads(n);
     if (!this.spawn) return "这个页面拿不到 SharedArrayBuffer，只能用单线程";
@@ -305,7 +310,9 @@ export class Z80Substrate implements Substrate {
   paint(c: number, b: Uint8Array): Promise<void> {
     return this.runExclusive(() => this.z.paint(c, b));
   }
-  configure(o: { noise?: number; steps?: number }) {
+  configure(o: { noise?: number; steps?: number; radius?: number; mixed?: boolean; density?: number }) {
+    // Z80 has no radius/density/mixed knobs in the reference; they are hidden
+    // in the UI and deliberately ignored here.
     if (o.noise !== undefined) this.z.noise = o.noise;
     if (o.steps !== undefined) this.z.steps = o.steps;
   }

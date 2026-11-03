@@ -140,6 +140,34 @@ if (frames === 0) { console.error("FAIL: no frames ran"); process.exit(1); }
 if (!statsHtml.some((r) => /\d/.test(r))) { console.error("FAIL: stats never updated"); process.exit(1); }
 if (!declared.has("grid")) { console.error("FAIL: script runs before #grid is parsed"); process.exit(1); }
 
+// ---- control wiring: every slider changes its readout, and the BFF default is
+// the paper's 1/4096 (the static HTML value is just a pre-boot placeholder)
+const setRange = (id, v) => {
+  const el = byId.get(id);
+  el.value = String(v);
+  el.fire("input");
+  return byId.get(id + "-v").textContent;
+};
+const expectRange = (id, v, want) => {
+  const got = setRange(id, v);
+  if (got !== want) {
+    console.error(`FAIL: #${id} index ${v} -> "${got}", want "${want}"`);
+    process.exit(1);
+  }
+};
+if (g("mutation-v") !== "0.024%") {
+  console.error(`FAIL: BFF default mutation is "${g("mutation-v")}", want 0.024% (1/4096)`);
+  process.exit(1);
+}
+expectRange("mutation", 0, "0%");
+expectRange("mutation", 1, "0.024%");
+expectRange("radius", 0, "完全混匀");
+expectRange("radius", 2, "2");
+expectRange("density", 3, "23.1%");
+expectRange("steps", 3, "512");
+expectRange("steps", 7, "8192");
+console.log("controls: mutation/radius/density/steps all change their readout");
+
 // ---- interaction checks -------------------------------------------------
 const state = () => byId.get("lab-state").textContent;
 // tick() is async now, so let the microtask queue drain between frames

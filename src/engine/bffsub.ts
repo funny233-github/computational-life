@@ -139,9 +139,16 @@ export class BffSubstrate implements Substrate {
   }
   setThreads(n: number): string {
     if (n <= 1) {
-      this.pool?.dispose();
-      this.pool = null;
-      return "单线程（配对在主线程上跑）";
+      const pool = this.pool;
+      if (!pool) return "单线程（配对在主线程上跑）";
+      // Don't terminate workers in the middle of an epoch: that would leave
+      // half its pairs written while the epoch is dropped and planned again.
+      // The pool stays until the in-flight step has recorded its epoch.
+      void this.runExclusive(() => {
+        pool.dispose();
+        if (this.pool === pool) this.pool = null;
+      });
+      return "单线程（正在切换）";
     }
     if (this.pool) return this.pool.setThreads(n);
     if (!this.spawn) return "这个页面拿不到 SharedArrayBuffer，只能用单线程";
@@ -154,9 +161,16 @@ export class BffSubstrate implements Substrate {
       return "并行启动失败：" + (e as Error).message;
     }
   }
-  configure(o: { noise?: number; steps?: number }) {
+  configure(o: { noise?: number; steps?: number; radius?: number; mixed?: boolean; density?: number }) {
     if (o.noise !== undefined) this.soup.setMutation(o.noise);
     if (o.steps !== undefined) this.soup.steps = o.steps;
+    // radius 0 is the well-mixed 0-D soup; any positive radius is the lattice
+    if (o.radius !== undefined) {
+      this.soup.radius = o.radius;
+      this.soup.mixed = o.radius === 0;
+    }
+    if (o.mixed !== undefined) this.soup.mixed = o.mixed;
+    if (o.density !== undefined) this.soup.density = o.density;
   }
 
   stats(): Stat[] {

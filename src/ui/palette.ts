@@ -75,6 +75,8 @@ export function setTheme(t: Theme) {
     BYTE_G[b] = g;
     BYTE_B[b] = bl;
   }
+  // the light palette draws pale bytes, so the light ink would disappear on them
+  mnemonicInk = t === "dark" ? "rgba(230,227,220,0.72)" : "rgba(24,22,20,0.78)";
   buildZ80(t);
 }
 
@@ -170,6 +172,11 @@ export function canvasBg() {
   return curTheme === "dark" ? CANVAS_BG_DARK : CANVAS_BG_LIGHT;
 }
 
+/** the same background as a CSS colour, for the letterbox around the soup */
+export function canvasBgCss(): string {
+  return curTheme === "dark" ? "#1d1c1a" : "#000";
+}
+
 /** backdrop of the two microscope canvases */
 export const ctx_muted_bg = () => "#131211";
 
@@ -189,7 +196,7 @@ export function cellColor(sub: { cellKey(c: number, mode: CellMode): number }, c
   return PALETTE[k & 0xff];
 }
 
-/** ink for the mnemonics printed inside the soup */
+/** ink for the mnemonics printed inside the soup; flips with the soup palette */
 let mnemonicInk = "rgba(230,227,220,0.72)";
 export { mnemonicInk };
 

@@ -45,7 +45,7 @@ let history: Series = { primary: [], secondary: [] };
 let rateAt = performance.now();
 let rateEpochs = 0;
 let frameCount = 0;
-let labGrid = 4;
+let labGrid = 8;
 
 
 
@@ -62,6 +62,8 @@ let lastStatsEpoch = -1;
 /** the world settings the sliders currently represent; a rebuild must keep them */
 let mutValue = 1 / 16;
 let stepsValue = 128;
+let radiusValue = 2;
+let densityValue = 0;
 /** bumped on every rebuild, so in-flight epochs from the old world are ignored */
 let generation = 0;
 let lastChartEpoch = -1;
@@ -361,11 +363,17 @@ function advanceLab(n: number) {
   }
   for (let i = 0; i < n && scope.step; i++) scope.step();
   labTotal += n;
-  progEl.value = decode(scope.tape.subarray(0, TAPE));
+  // don't overwrite what the user is typing into the editor
+  if (document.activeElement !== progEl) progEl.value = decode(scope.tape.subarray(0, TAPE));
   drawLabNow();
 }
 
 // ---------- main loop ----------
+
+function updateHint() {
+  if (!world) return;
+  $("hint").textContent = `格 ${selected % world.w},${Math.floor(selected / world.w)} · 空格${playing ? "暂停" : "继续"}`;
+}
 
 function updateStats() {
   if (!world) return;
@@ -393,7 +401,7 @@ function updateStats() {
   $("lg-secondary").textContent = (c.secondary * 100).toFixed(1) + "%";
 
   $("epoch").textContent = world.epoch.toLocaleString();
-  $("hint").textContent = `格 ${selected % world.w},${Math.floor(selected / world.w)} · 空格暂停`;
+  updateHint();
 
   if (world.epoch !== lastChartEpoch) {
     lastChartEpoch = world.epoch;
@@ -535,6 +543,9 @@ function bindRange(
     input.style.setProperty("--p", (idx / Math.max(1, values.length - 1)) * 100 + "%");
     apply(v);
   };
+  // the slider's value is an index into `values`; own both bounds, or a stale
+  // min/max in the HTML silently clamps some entries out of reach
+  input.min = "0";
   input.max = String(values.length - 1);
   input.addEventListener("input", upd);
   upd();
@@ -547,7 +558,18 @@ async function rebuild(w: number, h: number) {
   const old = world;
   const kind = old.kind;
   const threads = Number($<HTMLSelectElement>("threads").value) || undefined;
-  const made = await createSubstrate({ kind, w, h, seed: (Math.random() * 1e9) | 0, threads });
+  // carry the sliders into the new world: a rebuild must not quietly revert them
+  const made = await createSubstrate({
+    kind,
+    w,
+    h,
+    seed: (Math.random() * 1e9) | 0,
+    threads,
+    mutation: mutValue,
+    steps: stepsValue,
+    radius: radiusValue,
+    density: densityValue,
+  });
   // a second change while we were building: drop this one
   if (gen !== generation) {
     made.substrate.dispose?.();
@@ -555,7 +577,8 @@ async function rebuild(w: number, h: number) {
   }
   old.dispose?.();
   world = made.substrate;
-  // keep whatever the sliders say, instead of the substrate defaults
+  // the engine already received the values above; this keeps them in sync for
+  // substrates that ignore some of them (Z80 ignores radius/density/mixed)
   world.configure(kind === "z80" ? { noise: mutValue } : { noise: mutValue, steps: stepsValue });
   selected = Math.min(selected, world.n - 1);
   zoomLevel = 1;
@@ -649,8 +672,10 @@ async function boot() {
   console.log("[threads]", diag, "→", made.info);
   const want = Number((location.search.match(/threads=(\d+)/) ?? [])[1]);
   if (want >= 1) {
-    note.textContent = world!.setThreads?.(want) ?? "这个基质不支持多线程";
-    threadsSel.value = String(poolInfo().cores);
+    const msg = world!.setThreads?.(want) ?? "这个基质不支持多线程";
+    note.textContent = msg;
+    // a queued switch still reports the old pool for a tick; keep the URL's choice
+    if (!msg.includes("正在切换")) threadsSel.value = String(poolInfo().cores);
   }
 
   threadsSel.addEventListener("change", () => {
@@ -658,21 +683,30 @@ async function boot() {
     note.textContent = msg;
     if (!poolInfo().parallel && !msg.includes("正在切换")) note.classList.add("warn");
     else note.classList.remove("warn");
-    threadsSel.value = String(poolInfo().cores);
+    if (!msg.includes("正在切换")) threadsSel.value = String(poolInfo().cores);
     dirty = true;
   });
 
   // substrate-specific controls
+  // BFF-only world knobs
   for (const id of ["density", "radius", "steps"]) {
     const row = $(id).closest(".row") as HTMLElement | null;
     if (row) row.style.display = isZ80 ? "none" : "";
   }
-  for (const id of ["lab-run", "step", "swap", "labgrid", "prog", "preset", "paint"]) {
-    const el = $(id);
-    el.style.display = isZ80 ? "none" : "";
-    const row = el.closest(".row") as HTMLElement | null;
-    if (row) row.style.display = isZ80 ? "none" : "";
+  // BFF-only microscope controls: the editor, the seed/paint pair, and the
+  // run/step/swap row. Z80 keeps 重载 (lab-reset) — it lives in that same row,
+  // so hide the buttons individually instead of the whole row.
+  for (const id of ["preset", "paint", "lab-run", "step", "swap"]) {
+    $(id).style.display = isZ80 ? "none" : "";
   }
+  const seedRow = $("preset").closest(".row") as HTMLElement | null;
+  if (seedRow) seedRow.style.display = isZ80 ? "none" : "";
+  $("prog").style.display = isZ80 ? "none" : "";
+  // 每帧步数与粒度只对 BFF 的显微镜有意义（Z80 是滑杆回放、固定 4×4）
+  const speedRow = $("labspeed").closest(".row") as HTMLElement | null;
+  if (speedRow) speedRow.style.display = isZ80 ? "none" : "";
+  // BFF 没有「指令解说」，卡片留着只会显示占位符
+  $("insight").style.display = isZ80 ? "" : "none";
 
   $("panels").addEventListener("click", () => {
     const hidden = document.body.classList.toggle("hide-aside");
@@ -686,10 +720,14 @@ async function boot() {
     playing = !playing;
     dirty = true;
     $("play").textContent = playing ? "暂停" : "继续";
+    updateHint();
   });
 
   window.addEventListener("keydown", (e) => {
-    if ((e.target as HTMLElement).tagName === "TEXTAREA") return;
+    // never steal keys from a form control: arrow keys must adjust a focused
+    // slider, and Space must activate a focused button
+    const tag = (e.target as HTMLElement).tagName;
+    if (tag === "TEXTAREA" || tag === "INPUT" || tag === "SELECT" || tag === "BUTTON") return;
     if (e.code === "Space") {
       e.preventDefault();
       $("play").click();
@@ -714,11 +752,24 @@ async function boot() {
     },
   );
 
+  // The slider index for a substrate's paper default: BFF 1/4096, Z80 1/16.
+  // (The static value in index.html cannot know which substrate the URL asked for.)
+  $<HTMLInputElement>("mutation").value = String(isZ80 ? 3 : 1);
+
   bindRange(
     "mutation",
     "mutation-v",
     isZ80 ? NOISES : MUTATIONS,
-    (v) => (isZ80 ? (v >= 1 ? v + "×" : "1/" + Math.round(1 / v)) : (v * 100).toFixed(3) + "%"),
+    (v) =>
+      isZ80
+        ? v >= 1
+          ? v + "×"
+          : v > 0
+            ? "1/" + Math.round(1 / v)
+            : "0"
+        : v === 0
+          ? "0%"
+          : (v * 100).toFixed(3) + "%",
     (v) => {
       mutValue = v;
       world?.configure({ noise: v });
@@ -730,8 +781,13 @@ async function boot() {
     "density-v",
     DENSITIES,
     (v) => ((v + (1 - v) * 0.039) * 100).toFixed(1) + "%",
-    () => {},
+    (v) => {
+      densityValue = v;
+      // density seeds the initial bytes, so it lands on the next reset
+      world?.configure({ density: v });
+    },
   );
+  $("density").title = "下次点「重置」后生效";
 
   // the step budget only exists for BFF; Z80 always runs its 128 steps and a
   // rebuild must not push the hidden slider's value into it
@@ -743,11 +799,22 @@ async function boot() {
       (v) => String(v),
       (v) => {
         stepsValue = v;
+        world?.configure({ steps: v });
       },
     );
   }
 
-  bindRange("radius", "radius-v", [0, 1, 2, 3, 4], (v) => (v === 0 ? "完全混匀" : String(v)), () => {});
+  bindRange(
+    "radius",
+    "radius-v",
+    [0, 1, 2, 3, 4],
+    (v) => (v === 0 ? "完全混匀" : String(v)),
+    (v) => {
+      radiusValue = v;
+      world?.configure({ radius: v });
+    },
+  );
+  $("radius").title = "0 = 完全混匀（任意两条程序都能相遇）";
 
   // remember where the pointer is: some trackpads deliver wheel events with no
   // position at all (0,0), and anchoring those would zoom towards the top-left
@@ -922,14 +989,18 @@ async function boot() {
     drawLabNow();
   });
 
+  // keep the pool readout honest even when only the reason changes (e.g. a
+  // queued "正在切换" settling into "单线程"): compare the text, not just cores
+  let lastPoolNote = note.textContent;
   setInterval(() => {
     if (!world) return;
     $("epoch").textContent = world.epoch.toLocaleString();
-    // if a worker died the substrate falls back silently; say so
+    // if a worker died the substrate falls back; say so
     const pi = poolInfo();
-    if (pi.cores !== Number(threadsSel.value)) {
-      threadsSel.value = String(pi.cores);
+    if (pi.cores !== Number(threadsSel.value)) threadsSel.value = String(pi.cores);
+    if (pi.reason !== lastPoolNote) {
       note.textContent = pi.reason;
+      lastPoolNote = pi.reason;
     }
   }, 250);
 

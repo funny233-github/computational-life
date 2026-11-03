@@ -50,6 +50,31 @@ console.log(
     `0x00 ${(before.zeros * 100).toFixed(1)}% -> ${(after.zeros * 100).toFixed(1)}%`,
 );
 
+// 3b. "本轮写入" must only count the current epoch: unpaired cells used to keep
+// last round's count, so the panel was summing a mixture of two epochs.
+{
+  const base2 = { w: 48, h: 27, seed: 11, noise: 0, steps: Z80_STEPS };
+  // c only computes the plan that b's first step() will use (same seed)
+  const c = new Z80World(core, base2);
+  const plan = new Int32Array(8192 * 2);
+  const pairN = c.planInto(plan);
+  const paired = new Set<number>();
+  for (let p = 0; p < pairN; p++) {
+    paired.add(plan[p * 2]);
+    paired.add(plan[p * 2 + 1]);
+  }
+  const b = new Z80World(core, base2);
+  b.writes.fill(7); // pretend the previous epoch left counts everywhere
+  b.step(); // must clear them before handing the slices out
+  let stale = 0;
+  for (let cell = 0; cell < b.n; cell++) if (!paired.has(cell) && b.writes[cell] !== 0) stale++;
+  if (!(pairN > 0) || stale) {
+    console.error(`FAIL: writes are not per-epoch (${pairN} pairs, ${stale} stale unpaired cells)`);
+    process.exit(1);
+  }
+  console.log(`writes are per-epoch: ${pairN} pairs, unpaired cells cleared`);
+}
+
 // 4. disassembly table
 if (BYTE2ASM[0x01] !== "LD BC,nn" || BYTE2ASM[0xc5] !== "PUSH BC" || BYTE2ASM[0] !== "NOP") {
   console.error("FAIL: disassembly table looks wrong");

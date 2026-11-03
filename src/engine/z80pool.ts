@@ -23,6 +23,7 @@ export class Z80Pool implements PairPool {
   private pendingCores = 0;
   private threadTimer = 0;
   private onReady: (() => void) | null = null;
+  private readyTimer = 0;
   private waiting: (() => void) | null = null;
   private timer = 0;
   degraded = false;
@@ -89,6 +90,10 @@ export class Z80Pool implements PairPool {
         if (e.data.type === "ready") {
           this.readyCount++;
           if (this.readyCount === this.workers.length) {
+            if (this.readyTimer) {
+              clearTimeout(this.readyTimer);
+              this.readyTimer = 0;
+            }
             this.onReady?.();
             this.onReady = null;
           }
@@ -147,6 +152,8 @@ export class Z80Pool implements PairPool {
     if (this.degraded) return;
     this.degraded = true;
     this.info.reason = `${why}，已退回单线程`;
+    this.info.parallel = false;
+    this.info.cores = 1;
     this.dispose();
     const ready = this.onReady;
     this.onReady = null;
@@ -163,8 +170,13 @@ export class Z80Pool implements PairPool {
     if (this.ready) return Promise.resolve();
     return new Promise((resolve) => {
       this.onReady = resolve;
-      // never hang the whole page on a worker that fails to boot
-      setTimeout(() => this.fail("worker 启动超时"), 15000);
+      // never hang the whole page on a worker that fails to boot; and clear
+      // this once the workers are up, or a healthy pool dies 15s later
+      if (this.readyTimer) clearTimeout(this.readyTimer);
+      this.readyTimer = setTimeout(() => {
+        this.readyTimer = 0;
+        this.fail("worker 启动超时");
+      }, 15000) as unknown as number;
     });
   }
 
@@ -174,6 +186,7 @@ export class Z80Pool implements PairPool {
     const plan = new Int32Array(this.planSAB, 0, 8192 * 2);
     const gen = this.gen;
     const pairN = this.world.planInto(plan);
+    this.world.clearWrites(); // stale counts from the previous epoch must not leak
     this.done = 0;
     const cores = this.workers.length;
     const chunk = Math.ceil(pairN / cores) || 1;
@@ -203,11 +216,17 @@ export class Z80Pool implements PairPool {
   }
 
   dispose(final = true) {
+    if (this.readyTimer) {
+      clearTimeout(this.readyTimer);
+      this.readyTimer = 0;
+    }
     this.gen++;
     for (const w of this.workers) w.terminate();
     this.workers = [];
     this.degraded = true;
-    if (final) this.info.reason = "已停止";
+    // keep the actual failure ("worker 出错：…") instead of replacing it with
+    // "已停止" one line later
+    if (final && !this.info.reason.endsWith("已退回单线程")) this.info.reason = "已停止";
     const ready = this.onReady;
     this.onReady = null;
     ready?.();

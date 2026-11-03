@@ -45,7 +45,7 @@
             </div>
             <div class="row">
               <label>突变率</label>
-              <input id="mutation" type="range" min="0" max="8" value="3" />
+              <input id="mutation" type="range" min="0" max="8" value="1" />
               <output id="mutation-v">1/16</output>
             </div>
             <div class="row">
@@ -55,7 +55,7 @@
             </div>
             <div class="row">
               <label>步数上限</label>
-              <input id="steps" type="range" min="6" max="13" value="13" />
+              <input id="steps" type="range" min="0" max="7" value="7" />
               <output id="steps-v">8192</output>
             </div>
             <div class="row">
@@ -84,10 +84,10 @@
               </select>
             </div>
             <div class="row">
-              <label>配色</label>
+              <label>汤配色</label>
               <select id="theme">
-                <option value="dark" selected>暗色</option>
-                <option value="light">亮色（原作）</option>
+                <option value="dark" selected>暗色（默认）</option>
+                <option value="light">亮色（原作，仅汤）</option>
               </select>
               <button id="reset">重置</button>
             </div>

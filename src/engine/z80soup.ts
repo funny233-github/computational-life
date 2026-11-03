@@ -141,6 +141,12 @@ export class Z80World {
     this.rand = splitmix(seed);
     const r = this.rand;
     for (let i = 0; i < this.soup.length; i++) this.soup[i] = r() & 0xff;
+    this.clearWrites();
+  }
+
+  /** call before an epoch: only the cells that actually wrote should count */
+  clearWrites() {
+    this.writes.fill(0);
   }
 
   cellBytes(cell: number): Uint8Array {
@@ -212,6 +218,7 @@ export class Z80World {
 
   step() {
     const pairN = this.planInto(this.idx);
+    this.clearWrites(); // "本轮写入" must not sum last round's leftovers
     this.runSlice(this.idx, 0, pairN);
     this.finishEpoch(pairN);
   }

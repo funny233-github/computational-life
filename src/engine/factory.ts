@@ -15,6 +15,11 @@ interface CreateOptions {
   seed: number;
   /** worker count; defaults to "one less than the machine" */
   threads?: number;
+  /** live parameters carried across a rebuild (the UI sliders) */
+  mutation?: number;
+  steps?: number;
+  radius?: number;
+  density?: number;
 }
 
 function hasSAB(): boolean {
@@ -37,7 +42,13 @@ export async function createSubstrate(o: CreateOptions): Promise<{ substrate: Su
   const sab = hasSAB();
 
   if (o.kind === "z80") {
-    const base = { w: o.w, h: o.h, seed: o.seed, noise: 1 / 16, steps: Z80_STEPS };
+    const base = {
+      w: o.w,
+      h: o.h,
+      seed: o.seed,
+      noise: o.mutation ?? 1 / 16,
+      steps: Z80_STEPS,
+    };
     if (sab) {
       try {
         // the soup always lives in shared memory when we can, so that raising
@@ -65,14 +76,15 @@ export async function createSubstrate(o: CreateOptions): Promise<{ substrate: Su
     return { substrate: createZ80(new Z80World(core, base), null, null, scope), info: NO_SAB };
   }
 
+  const radius = o.radius ?? 2;
   const base = {
     w: o.w,
     h: o.h,
-    mutation: 1 / 4096,
-    steps: 8192,
-    radius: 2,
-    mixed: false,
-    density: 0,
+    mutation: o.mutation ?? 1 / 4096,
+    steps: o.steps ?? 8192,
+    radius,
+    mixed: radius === 0,
+    density: o.density ?? 0,
     seed: o.seed,
   };
   const { soup, pool, info } = Pool.create(base, threads);

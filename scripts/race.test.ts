@@ -80,13 +80,16 @@ resolveStep = null;
 // ------------------------------------------------- thread control is not a dead end
 {
   const spawned: number[] = [];
+  let fake2Disposed = 0;
   const fake2: PairPool = {
     info: { cores: 2, parallel: true, reason: "fake pool 2" },
     ready: true,
     degraded: false,
     step: async () => true,
     setThreads: () => "fake",
-    dispose() {},
+    dispose() {
+      fake2Disposed++;
+    },
   };
   const sub2 = new BffSubstrate(soup, null, (n) => {
     spawned.push(n);
@@ -94,8 +97,41 @@ resolveStep = null;
   });
   check("1 -> N spawns workers", sub2.setThreads(4).length > 0 && sub2.poolInfo().parallel === true);
   sub2.setThreads(1);
-  check("N -> 1 drops to the serial path", sub2.poolInfo().parallel === false);
+  await tick(); // the teardown is queued so it can drain an in-flight epoch
+  check("N -> 1 drops to the serial path", sub2.poolInfo().parallel === false && fake2Disposed === 1);
   check("...and can go back up (spawn is not lost)", sub2.setThreads(3).length > 0 && spawned.includes(3));
+}
+
+// ------------------------------------- downgrade drains the epoch first
+{
+  const soup3 = new Soup({ w: 8, h: 8, mutation: 0, steps: 64, radius: 2, mixed: false, density: 0, seed: 6 });
+  let release3: ((ok: boolean) => void) | null = null;
+  let disposed3 = 0;
+  const fake3: PairPool = {
+    info: { cores: 2, parallel: true, reason: "fake pool 3" },
+    ready: true,
+    degraded: false,
+    step() {
+      return new Promise<boolean>((r) => {
+        release3 = r;
+      });
+    },
+    setThreads: () => "fake",
+    dispose() {
+      disposed3++;
+    },
+  };
+  const sub3 = new BffSubstrate(soup3, fake3, () => fake3);
+  const stepP = sub3.step();
+  await tick();
+  check("third fake epoch in flight", release3 !== null);
+  sub3.setThreads(1);
+  await tick();
+  check("downgrade waits for the in-flight epoch", disposed3 === 0);
+  release3!(true);
+  await stepP;
+  await tick();
+  check("downgrade disposes once the epoch is done", disposed3 === 1 && sub3.poolInfo().parallel === false);
 }
 
 if (fails) {

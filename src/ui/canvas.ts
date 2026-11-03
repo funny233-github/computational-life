@@ -1,6 +1,6 @@
 /** rasterisation: bytes in, pixels out. No simulation logic lives here. */
 import type { CellMode } from "../engine/substrate.ts";
-import { byteColors, canvasBg, cellColor, mnemonicInk, pack } from "./palette.ts";
+import { byteColors, canvasBg, canvasBgCss, cellColor, mnemonicInk, pack } from "./palette.ts";
 import { blitRect, camFor, cellAt } from "./geometry.ts";
 
 const MONO = `ui-monospace, "DejaVu Sans Mono", "Liberation Mono", monospace`;
@@ -363,7 +363,7 @@ export class SoupCanvas {
     const cell = this.cellPx();
     const ctx = this.ctx;
     ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = "rgba(29,28,26,1)";
+    ctx.fillStyle = canvasBgCss();
     ctx.fillRect(0, 0, this.el.width, this.el.height);
     // one blit for the whole soup; fractional offsets are handled by the GPU.
     // `k` is pixels per *source* pixel, which in byte mode is per byte, so the
