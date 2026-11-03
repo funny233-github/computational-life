@@ -3,7 +3,7 @@
  *    agree exactly — they are two implementations of the same interpreter.
  * 2. the hand-written replicator must still replicate.
  */
-import { Exec, PAIR, TAPE, encode, evalTape } from "../src/engine/bff.ts";
+import { Exec, PAIR, TAPE, decode, encode, evalTape } from "../src/engine/bff.ts";
 import { REPLICATOR } from "../src/engine/programs.ts";
 import { Soup } from "../src/engine/soup.ts";
 
@@ -38,6 +38,23 @@ for (let trial = 0; trial < 400; trial++) {
 }
 if (bad) { console.error(`FAIL: ${bad}/400 tapes diverge between evalTape and Exec`); process.exit(1); }
 console.log("evalTape and Exec agree on 400 random tapes");
+
+// decode -> textarea -> encode must be lossless for real instructions and for
+// the null byte. 0x00 decodes to "0"; encoding it as ASCII '0' (0x30) used to
+// silently turn every loop terminator into a data byte on "paint".
+{
+  let broken = 0;
+  for (const b of [0x00, 0x01, ...INSTR]) {
+    const text = decode(new Uint8Array([b]), 1);
+    const back = encode(text)[0];
+    if (back !== b) {
+      broken++;
+      if (broken === 1) console.error(`FAIL: decode/encode round-trip 0x${b.toString(16)} -> "${text}" -> 0x${back.toString(16)}`);
+    }
+  }
+  if (broken) process.exit(1);
+  console.log("decode/encode round-trips instructions and the null byte");
+}
 
 // the replicator: seed a nucleus into a small lattice, expect it to take over
 const A = encode(REPLICATOR);

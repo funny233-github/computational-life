@@ -219,6 +219,8 @@ export class Z80Substrate implements Substrate {
   private pool: PairPool | null;
   private spawn: ((n: number) => PairPool | null) | null;
   private scopeCore: Z80Core | null;
+  /** serialises step/reset/paint so a user write cannot land mid-epoch */
+  private queue: Promise<unknown> = Promise.resolve();
 
   constructor(
     z: Z80World,
@@ -234,22 +236,32 @@ export class Z80Substrate implements Substrate {
     this.h = z.h;
     this.n = z.n;
   }
+  private runExclusive<T>(fn: () => T | Promise<T>): Promise<T> {
+    const run = this.queue.then(fn, fn);
+    this.queue = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
   get sync() {
     // until the workers are up we simply do the work here
     return this.pool === null || !this.pool.ready;
   }
-  async step() {
-    if (!this.pool || !this.pool.ready) {
-      this.z.step();
-      return true;
-    }
-    const pool = this.pool;
-    const ok = await pool.step();
-    // `false` means "this epoch was dropped": either the pool is dead
-    // (degraded) or the worker set was replaced mid-epoch. Only the first case
-    // may cost us the pool — the second one just restarted it.
-    if (!ok && this.pool === pool && pool.degraded) this.pool = null;
-    return ok;
+  step(): Promise<boolean> {
+    return this.runExclusive(async () => {
+      if (!this.pool || !this.pool.ready) {
+        this.z.step();
+        return true;
+      }
+      const pool = this.pool;
+      const ok = await pool.step();
+      // `false` means "this epoch was dropped": either the pool is dead
+      // (degraded) or the worker set was replaced mid-epoch. Only the first case
+      // may cost us the pool — the second one just restarted it.
+      if (!ok && this.pool === pool && pool.degraded) this.pool = null;
+      return ok;
+    });
   }
   dispose() {
     this.pool?.dispose();
@@ -281,8 +293,8 @@ export class Z80Substrate implements Substrate {
   stepSync() {
     this.z.step();
   }
-  reset(seed?: number) {
-    this.z.reset(seed);
+  reset(seed?: number): Promise<void> {
+    return this.runExclusive(() => this.z.reset(seed));
   }
   bytes() {
     return this.z.soup;
@@ -290,8 +302,8 @@ export class Z80Substrate implements Substrate {
   cellBytes(c: number) {
     return this.z.cellBytes(c);
   }
-  paint(c: number, b: Uint8Array) {
-    this.z.paint(c, b);
+  paint(c: number, b: Uint8Array): Promise<void> {
+    return this.runExclusive(() => this.z.paint(c, b));
   }
   configure(o: { noise?: number; steps?: number }) {
     if (o.noise !== undefined) this.z.noise = o.noise;

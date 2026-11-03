@@ -1,7 +1,16 @@
 import { BYTE_CLASS, Exec, NOP, OP, OP_CHAR, TAPE, decode, encode } from "./bff.ts";
 import { REPLICATOR } from "./programs.ts";
-import type { Block, CellMode, ChartPoint, Listing, Microscope, PoolInfo, Stat, Substrate } from "./substrate.ts";
-import type { Pool } from "./pool.ts";
+import type {
+  Block,
+  CellMode,
+  ChartPoint,
+  Listing,
+  Microscope,
+  PairPool,
+  PoolInfo,
+  Stat,
+  Substrate,
+} from "./substrate.ts";
 import type { Soup } from "./soup.ts";
 
 class TapeMicroscope implements Microscope {
@@ -57,10 +66,16 @@ export class BffSubstrate implements Substrate {
   readonly h: number;
   readonly n: number;
   private soup: Soup;
-  private pool: Pool | null;
-  private spawn: ((n: number) => Pool | null) | null;
+  private pool: PairPool | null;
+  private spawn: ((n: number) => PairPool | null) | null;
+  /**
+   * Serialises everything that touches the shared soup. `step()` runs workers
+   * asynchronously, so a reset/paint from an event handler could otherwise land
+   * in the middle of an epoch and be overwritten (or tear a tape in half).
+   */
+  private queue: Promise<unknown> = Promise.resolve();
 
-  constructor(soup: Soup, pool: Pool | null, spawn: ((n: number) => Pool | null) | null = null) {
+  constructor(soup: Soup, pool: PairPool | null, spawn: ((n: number) => PairPool | null) | null = null) {
     this.soup = soup;
     this.pool = pool;
     this.spawn = spawn;
@@ -68,6 +83,16 @@ export class BffSubstrate implements Substrate {
     this.h = soup.h;
     this.n = soup.n;
   }
+
+  private runExclusive<T>(fn: () => T | Promise<T>): Promise<T> {
+    const run = this.queue.then(fn, fn);
+    this.queue = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
   get epoch() {
     return this.soup.epoch;
   }
@@ -75,24 +100,26 @@ export class BffSubstrate implements Substrate {
     // until the workers are up we simply do the work here
     return this.pool === null || !this.pool.ready;
   }
-  async step() {
-    if (!this.pool || !this.pool.ready) {
-      this.soup.step();
-      return true;
-    }
-    const pool = this.pool;
-    const ok = await pool.step();
-    // `false` means "this epoch was dropped": either the pool is dead
-    // (degraded) or the worker set was replaced mid-epoch. Only the first case
-    // may cost us the pool — the second one just restarted it.
-    if (!ok && this.pool === pool && pool.degraded) this.pool = null;
-    return ok;
+  step(): Promise<boolean> {
+    return this.runExclusive(async () => {
+      if (!this.pool || !this.pool.ready) {
+        this.soup.step();
+        return true;
+      }
+      const pool = this.pool;
+      const ok = await pool.step();
+      // `false` means "this epoch was dropped": either the pool is dead
+      // (degraded) or the worker set was replaced mid-epoch. Only the first case
+      // may cost us the pool — the second one just restarted it.
+      if (!ok && this.pool === pool && pool.degraded) this.pool = null;
+      return ok;
+    });
   }
   stepSync() {
     this.soup.step();
   }
-  reset(seed?: number) {
-    this.soup.reset(seed);
+  reset(seed?: number): Promise<void> {
+    return this.runExclusive(() => this.soup.reset(seed));
   }
   bytes() {
     return this.soup.progs;
@@ -100,8 +127,8 @@ export class BffSubstrate implements Substrate {
   cellBytes(c: number) {
     return this.soup.cellBytes(c);
   }
-  paint(c: number, b: Uint8Array) {
-    this.soup.paint(c, b);
+  paint(c: number, b: Uint8Array): Promise<void> {
+    return this.runExclusive(() => this.soup.paint(c, b));
   }
   dispose() {
     this.pool?.dispose();

@@ -810,15 +810,15 @@ async function boot() {
     drawLabNow();
   });
 
-  $("reset").addEventListener("click", () => {
-    world!.reset((Math.random() * 1e9) | 0);
+  $("reset").addEventListener("click", async () => {
+    // reset() queues behind any in-flight epoch, so wait for it before
+    // reading the soup back into the panels
+    await world!.reset((Math.random() * 1e9) | 0);
     history = { primary: [], secondary: [] };
     lastChartEpoch = -1;
     lastStatsEpoch = -1;
     dirty = true;
     updateStats();
-  
-    history = { primary: [], secondary: [] };
     loadLab();
   });
 
@@ -879,7 +879,7 @@ async function boot() {
     updateStats();
   });
 
-  $("preset").addEventListener("click", () => {
+  $("preset").addEventListener("click", async () => {
     if (world!.kind !== "bff") return;
     const bytes = world!.preset!();
     progEl.value = decode(bytes);
@@ -890,15 +890,17 @@ async function boot() {
         const x = cx + dx;
         const y = cy + dy;
         if (x < 0 || y < 0 || x >= world!.w || y >= world!.h) continue;
-        world!.paint(y * world!.w + x, bytes);
+        // one at a time: each paint waits for any in-flight epoch, and the
+        // last await guarantees the whole nucleus is visible to loadLab()
+        await world!.paint(y * world!.w + x, bytes);
       }
     }
     loadLab();
   });
 
-  $("paint").addEventListener("click", () => {
+  $("paint").addEventListener("click", async () => {
     if (world!.kind !== "bff") return;
-    world!.paint(selected, encode(progEl.value));
+    await world!.paint(selected, encode(progEl.value));
     loadLab();
   });
 

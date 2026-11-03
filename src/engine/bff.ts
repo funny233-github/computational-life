@@ -221,8 +221,9 @@ export class Exec {
 /** Decode 64 bytes to editable text.
  *  Instructions keep their own character, 0x00 -> '0', 0x01 -> '#' (a non-zero
  *  no-op that hand-written replicators need as filler), everything else -> '·'.
- *  Encoding '·' or a space yields 0x00, '#' yields 0x01 — so code round-trips
- *  exactly; random junk bytes collapse to 0x00, which is the sane default. */
+ *  Encoding '0', '·' or a space yields 0x00, '#' yields 0x01 — so code
+ *  round-trips exactly; random junk bytes collapse to 0x00, which is the sane
+ *  default. */
 export function decode(tape: Uint8Array, len = TAPE): string {
   let s = "";
   for (let i = 0; i < len; i++) {
@@ -241,7 +242,9 @@ export function encode(text: string, len = TAPE): Uint8Array {
   for (const ch of text) {
     if (i >= len) break;
     if (ch === "#") out[i++] = 1;
-    else if (ch === "·" || ch === " " || ch === "\n" || ch === "\t") out[i++] = 0;
+    // '0' is how `decode` prints the null byte; encoding it as 0x30 (the ASCII
+    // code of '0') would silently turn every null into a data byte on "paint".
+    else if (ch === "0" || ch === "·" || ch === " " || ch === "\n" || ch === "\t") out[i++] = 0;
     else out[i++] = ch.charCodeAt(0) & 0xff;
   }
   return out;

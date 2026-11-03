@@ -112,12 +112,14 @@ export interface Substrate {
 
   step(): Promise<boolean> | boolean;
   stepSync(): void;
-  reset(seed?: number): void;
+  /** queued behind any in-flight epoch, so it cannot race a worker write */
+  reset(seed?: number): Promise<void>;
 
   /** all bytes, one program per cell, `side*side` bytes each */
   bytes(): Uint8Array;
   cellBytes(c: number): Uint8Array;
-  paint(c: number, bytes: Uint8Array): void;
+  /** queued behind any in-flight epoch, so the nucleus is not overwritten */
+  paint(c: number, bytes: Uint8Array): Promise<void>;
 
   stats(): Stat[];
   chart(): ChartPoint;

@@ -75,12 +75,15 @@ export async function createSubstrate(o: CreateOptions): Promise<{ substrate: Su
     density: 0,
     seed: o.seed,
   };
-  const { soup, pool, info } = Pool.create(base);
-  if (threads > 1 && pool) return { substrate: new BffSubstrate(soup, pool), info: info.reason };
-  pool?.dispose();
+  const { soup, pool, info } = Pool.create(base, threads);
+  // `spawn` is wired unconditionally: if it were only passed when the page
+  // started single-threaded, dropping to 1 thread once would permanently lock
+  // the substrate to the serial path ("no SharedArrayBuffer" on the way back).
   const spawn = sab ? (n: number) => Pool.attach(soup, base, n) : null;
+  const active = threads > 1 && pool ? pool : null;
+  if (!active) pool?.dispose();
   return {
-    substrate: new BffSubstrate(soup, null, spawn),
-    info: sab ? "单线程（拉到 2 线程以上就能并行）" : info.reason,
+    substrate: new BffSubstrate(soup, active, spawn),
+    info: info.reason,
   };
 }

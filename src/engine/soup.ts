@@ -17,6 +17,25 @@ export interface SoupOptions {
   seed: number;
   /** optional SharedArrayBuffer backing store: lets several workers run one epoch */
   buffer?: SharedArrayBuffer | ArrayBuffer;
+  /**
+   * Skip the initial `reset()`. A worker attaches to a soup the main thread has
+   * already filled, so resetting there would wipe the shared world — and the
+   * worker's `epoch`/`totalOps` would no longer describe the bytes it sees.
+   */
+  skipReset?: boolean;
+}
+
+/**
+ * What a worker needs before it runs one epoch's slice. `epoch` belongs here
+ * because the mutation RNG is seeded from `(seed, epoch, pairIndex)`: a worker
+ * that pins `epoch = 0` reuses the same mutation draws every round, so the
+ * "random" noise stops being random (and diverges from the serial path).
+ */
+export interface EpochParams {
+  epoch: number;
+  seed: number;
+  mutation: number;
+  steps: number;
 }
 
 export interface Stats {
@@ -115,7 +134,28 @@ export class Soup {
       this.toks = new Uint32Array(this.n * TAPE);
     }
     this.buildCdfs();
-    this.reset(o.seed);
+    if (!o.skipReset) this.reset(o.seed);
+  }
+
+  /**
+   * A view over a soup that already exists in shared memory. Used by workers:
+   * it must never call `reset()`, or every `setThreads()` would erase the world.
+   */
+  static attach(buffer: SharedArrayBuffer, o: Omit<SoupOptions, "buffer">): Soup {
+    return new Soup({ ...o, buffer, skipReset: true });
+  }
+
+  /** Adopt the epoch/config the main thread is about to run. Called per epoch. */
+  setEpochParams(p: EpochParams) {
+    this.epoch = p.epoch;
+    this.seed = p.seed;
+    this.steps = p.steps;
+    if (this.mutation !== p.mutation) this.setMutation(p.mutation);
+  }
+
+  /** the params that describe the *next* epoch this soup will run */
+  epochParams(): EpochParams {
+    return { epoch: this.epoch, seed: this.seed, mutation: this.mutation, steps: this.steps };
   }
 
   static bufferSize(n: number): number {
@@ -260,7 +300,7 @@ export class Soup {
       for (let i = 0; i < k; i++) {
         const j = (r() * (TAPE * 2)) | 0;
         tape[j] = (r() * 256) | 0;
-        ttape[j] = this.nextTok++;
+        ttape[j] = this.tokenAt(this.epoch, 1, pairIndex, j);
       }
     }
     const ops = evalTape(tape, this.steps, ttape);
@@ -282,8 +322,22 @@ export class Soup {
     for (let i = 0; i < k; i++) {
       const j = (r() * TAPE) | 0;
       progs[off + j] = (r() * 256) | 0;
-      toks[off + j] = this.nextTok++;
+      toks[off + j] = this.tokenAt(this.epoch, 2, cell, j);
     }
+  }
+
+  /**
+   * A deterministic token for one mutation. Tokens are the "radioactive
+   * tracers" the lineage view follows, so they must be identical whether the
+   * pair ran on the main thread or in a worker — a per-instance counter is
+   * not: every worker starts at the same value and collides.
+   *
+   * `domain` separates the pair mutations (1) from the leftover pass (2) so
+   * cell 7 and pair 7 cannot mint the same id in the same epoch.
+   */
+  private tokenAt(epoch: number, domain: number, index: number, slot: number): number {
+    const key = mix32(streamSeed(this.seed, epoch, (domain << 16) | (index & 0xffff)) ^ Math.imul(slot + 1, 0x9e3779b1));
+    return key || 1;
   }
 
   private mutCount(cdf: Float64Array, r: () => number): number {

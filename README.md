@@ -278,6 +278,8 @@ scripts/z80.test.ts      Z80 核真的在执行、栈写入落到汤里、熵下
                          助记符字形与指令长度
 scripts/z80par.test.ts   并行切片 == 串行（逐字节），含大图分块
 scripts/par.test.ts      BFF 并行 == 串行
+scripts/epoch.test.ts    worker 不 reset 世界；每轮 epoch/参数下发；并行 == 串行（含血统 token）
+scripts/race.test.ts     reset/paint 排队到 epoch 边界；线程数可以降下去再升回来
 scripts/render.test.ts   渲染：三种视图互不相同、像素级对齐
 scripts/zoom.test.ts     相机三条公式：cellAt / camFor / blitRect
 scripts/insight.test.ts  指令解说：每条家族一句话，用手写寄存器钉住

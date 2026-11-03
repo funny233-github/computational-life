@@ -182,20 +182,19 @@ export class Z80Pool implements PairPool {
       this.waiting = resolve;
     });
     this.timer = setTimeout(() => this.fail("worker 超时未应答（第一轮可能需要编译 wasm）"), 8000) as unknown as number;
-    let sent = 0;
+    // read `world.steps`, not the build-time snapshot: configure({steps}) must
+    // reach the workers even though the UI currently hides that control for Z80
+    const steps = this.world.steps;
     for (let i = 0; i < cores; i++) {
       const p0 = i * chunk;
       const p1 = Math.min(pairN, p0 + chunk);
       if (p0 >= pairN) {
         // still answer, so the barrier count stays honest
-        this.workers[i].postMessage({ type: "epoch", p0: 0, p1: 0, steps: this.opts.steps });
-        sent++;
+        this.workers[i].postMessage({ type: "epoch", p0: 0, p1: 0, steps });
         continue;
       }
-      this.workers[i].postMessage({ type: "epoch", p0, p1, steps: this.opts.steps });
-      sent++;
+      this.workers[i].postMessage({ type: "epoch", p0, p1, steps });
     }
-    void sent;
     await barrier;
     // the worker set was replaced (or the pool disposed) while we waited
     if (gen !== this.gen || this.degraded) return false;
