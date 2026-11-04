@@ -134,6 +134,39 @@ resolveStep = null;
   check("downgrade disposes once the epoch is done", disposed3 === 1 && sub3.poolInfo().parallel === false);
 }
 
+// ------------------------- a newer choice cancels the queued downgrade
+{
+  const soup4 = new Soup({ w: 8, h: 8, mutation: 0, steps: 64, radius: 2, mixed: false, density: 0, seed: 7 });
+  let release4: ((ok: boolean) => void) | null = null;
+  let disposed4 = 0;
+  const fake4: PairPool = {
+    info: { cores: 2, parallel: true, reason: "fake pool 4" },
+    ready: true,
+    degraded: false,
+    step() {
+      return new Promise<boolean>((r) => {
+        release4 = r;
+      });
+    },
+    setThreads: () => "fake",
+    dispose() {
+      disposed4++;
+    },
+  };
+  const sub4 = new BffSubstrate(soup4, fake4, () => fake4);
+  const stepP = sub4.step();
+  await tick();
+  sub4.setThreads(1); // queued behind the epoch
+  sub4.setThreads(4); // ...but the user changes their mind first
+  release4!(true);
+  await stepP;
+  await tick();
+  check(
+    "a newer thread choice cancels the queued downgrade",
+    disposed4 === 0 && sub4.poolInfo().parallel === true,
+  );
+}
+
 if (fails) {
   console.error(`race/serialisation: ${fails} failure(s)`);
   process.exit(1);

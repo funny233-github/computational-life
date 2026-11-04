@@ -35,6 +35,24 @@ const DENSITIES = [0, 0.05, 0.1, 0.2, 0.35, 0.5, 0.75];
 const W = 96;
 const H = 54;
 
+/** the menu; also the whitelist for ?mapsize, so a typo cannot blank the page */
+const MAP_SIZES: [number, number, string][] = [
+  [48, 27, "48 × 27"],
+  [64, 36, "64 × 36"],
+  [96, 54, "96 × 54（默认）"],
+  [128, 72, "128 × 72"],
+  [192, 108, "192 × 108"],
+  [240, 135, "240 × 135（论文规模）"],
+];
+
+function requestedSize(q: string): [number, number] | null {
+  const m = /[?&]mapsize=(\d+)x(\d+)/.exec(q);
+  if (!m) return null;
+  const w = Number(m[1]);
+  const h = Number(m[2]);
+  return MAP_SIZES.some(([mw, mh]) => mw === w && mh === h) ? [w, h] : null;
+}
+
 let world: Substrate | null = null;
 
 let playing = true;
@@ -596,8 +614,17 @@ async function rebuild(w: number, h: number) {
 async function boot() {
   const kind = location.search.includes("bff") ? "bff" : "z80";
   const seed = (Math.random() * 1e9) | 0;
-  const made = await createSubstrate({ kind, w: W, h: H, seed });
+  // build the requested size up front instead of building 96×54 and throwing
+  // it away 800ms later; an unknown size falls back with a console note
+  const asked = requestedSize(location.search);
+  if (/mapsize=/.test(location.search) && !asked) {
+    console.warn(`[mapsize] ${location.search.match(/mapsize=([^&]*)/)?.[1]} 不在菜单里，用 ${W}×${H}`);
+  }
+  const bw = asked?.[0] ?? W;
+  const bh = asked?.[1] ?? H;
+  const made = await createSubstrate({ kind, w: bw, h: bh, seed });
   world = made.substrate;
+  selected = Math.floor(bh / 2) * bw + Math.floor(bw / 2);
 
   $("mode").textContent = kind === "z80" ? "Z80" : "BFF";
   const isZ80 = kind === "z80";
@@ -623,21 +650,13 @@ async function boot() {
 
   // map size: a rebuild, because the grid is baked into the buffers
   const sizeSel = $<HTMLSelectElement>("mapsize");
-  const SIZES: [number, number, string][] = [
-    [48, 27, "48 × 27"],
-    [64, 36, "64 × 36"],
-    [96, 54, "96 × 54（默认）"],
-    [128, 72, "128 × 72"],
-    [192, 108, "192 × 108"],
-    [240, 135, "240 × 135（论文规模）"],
-  ];
-  for (const [w, h, label] of SIZES) {
+  for (const [w, h, label] of MAP_SIZES) {
     const o = document.createElement("option");
     o.value = `${w}x${h}`;
     o.textContent = label;
     sizeSel.append(o);
   }
-  sizeSel.value = `${W}x${H}`;
+  sizeSel.value = `${bw}x${bh}`;
   sizeSel.addEventListener("change", () => {
     const [nw, nh] = sizeSel.value.split("x").map(Number);
     void rebuild(nw, nh);
@@ -1053,12 +1072,6 @@ async function boot() {
     document.body.dataset.epoch = String(world.epoch);
   }, 500);
 
-  const size0 = (location.search.match(/mapsize=(\d+x\d+)/) ?? [])[1];
-  if (size0) {
-    sizeSel.value = size0;
-    setTimeout(() => void rebuild(...(size0.split("x").map(Number) as [number, number])), 800);
-  }
-
   const view0 = (location.search.match(/view=(code|lineage|bytes)/) ?? [])[1];
   if (view0) {
     view = view0 as ViewMode | "bytes";
@@ -1096,6 +1109,7 @@ async function boot() {
   });
   ro.observe(canvas.parentElement!);
   resizeGrid();
+  if (asked) centerCamera();
   loadLab();
   updateStats();
   rafId = requestAnimationFrame(frame);

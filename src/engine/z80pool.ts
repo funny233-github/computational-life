@@ -26,6 +26,9 @@ export class Z80Pool implements PairPool {
   private readyTimer = 0;
   private waiting: (() => void) | null = null;
   private timer = 0;
+  /** a thread change that arrived mid-epoch, applied once the epoch is safe */
+  private respawnAfter: number | null = null;
+  private respawnTimer = 0;
   degraded = false;
 
   /** start workers over a world that already lives in shared memory */
@@ -118,7 +121,20 @@ export class Z80Pool implements PairPool {
   setThreads(n: number): string {
     const cores = Math.max(1, Math.min(8, n | 0));
     if (this.degraded) return "并行已失效，重置后恢复";
-    if (cores === this.workers.length) return this.info.reason;
+    if (cores === this.workers.length) {
+      // selecting the current count cancels a switch queued for epoch end
+      this.respawnAfter = null;
+      if (this.respawnTimer) {
+        clearTimeout(this.respawnTimer);
+        this.respawnTimer = 0;
+      }
+      this.pendingCores = cores;
+      if (this.threadTimer) {
+        clearTimeout(this.threadTimer);
+        this.threadTimer = 0;
+      }
+      return this.info.reason;
+    }
     // replacing workers costs a wasm compile each; coalesce rapid changes
     this.pendingCores = cores;
     if (this.threadTimer) clearTimeout(this.threadTimer);
@@ -126,15 +142,31 @@ export class Z80Pool implements PairPool {
       this.threadTimer = 0;
       const want = this.pendingCores;
       if (want === this.workers.length) return;
-      try {
-        this.dispose(false);
-        this.degraded = false;
-        this.spawn(want);
-      } catch (e) {
-        this.fail("启动 worker 失败：" + (e as Error).message);
+      // Terminating workers mid-epoch loses the pairs they already wrote and
+      // the epoch is not recorded, so it would be planned again on top of a
+      // half-written soup. Wait for the barrier instead.
+      if (this.waiting) {
+        this.respawnAfter = want;
+        return;
       }
+      this.respawn(want);
     }, 200) as unknown as number;
     return `${cores} 个 worker（正在切换）`;
+  }
+
+  private respawn(cores: number) {
+    this.respawnAfter = null;
+    if (this.respawnTimer) {
+      clearTimeout(this.respawnTimer);
+      this.respawnTimer = 0;
+    }
+    try {
+      this.dispose(false);
+      this.degraded = false;
+      this.spawn(cores);
+    } catch (e) {
+      this.fail("启动 worker 失败：" + (e as Error).message);
+    }
   }
 
   private release() {
@@ -145,6 +177,19 @@ export class Z80Pool implements PairPool {
     const r = this.waiting;
     this.waiting = null;
     r?.();
+    const next = this.respawnAfter;
+    // let the awaiting step() record the epoch it just ran before swapping
+    // workers: doing it synchronously would make `gen` change under its feet
+    if (next !== null && !this.degraded) this.scheduleRespawn(next);
+  }
+
+  private scheduleRespawn(cores: number) {
+    this.respawnAfter = null;
+    if (this.respawnTimer) clearTimeout(this.respawnTimer);
+    this.respawnTimer = setTimeout(() => {
+      this.respawnTimer = 0;
+      if (!this.degraded) this.respawn(cores);
+    }, 0) as unknown as number;
   }
 
   private fail(why: string) {
@@ -216,6 +261,11 @@ export class Z80Pool implements PairPool {
   }
 
   dispose(final = true) {
+    this.respawnAfter = null;
+    if (this.respawnTimer) {
+      clearTimeout(this.respawnTimer);
+      this.respawnTimer = 0;
+    }
     if (this.readyTimer) {
       clearTimeout(this.readyTimer);
       this.readyTimer = 0;

@@ -4,6 +4,7 @@
  * 2. the hand-written replicator must still replicate.
  */
 import { Exec, PAIR, decode, encode, evalTape } from "../src/engine/bff.ts";
+import { BffSubstrate } from "../src/engine/bffsub.ts";
 import { REPLICATOR } from "../src/engine/programs.ts";
 import { Soup } from "../src/engine/soup.ts";
 
@@ -71,3 +72,18 @@ for (let e = 0; e < 400; e++) {
 }
 if (!(top1 > 0.1)) { console.error(`FAIL: replicator did not spread (top1=${top1.toFixed(3)})`); process.exit(1); }
 console.log(`replicator spread to ${(top1 * 100).toFixed(0)}% of the soup in 400 epochs`);
+
+// the "cell type" view must be able to say "data": starting the search at class
+// 1 made every data-dominated cell render with the bracket colour
+{
+  const sub = new BffSubstrate(soup, null);
+  const data = new Uint8Array(64).fill(0x41); // 'A' is a data byte
+  const brackets = new Uint8Array(64).fill(0x5b); // '[' is a bracket
+  soup.paint(0, data);
+  soup.paint(1, brackets);
+  if (sub.cellKey(0, "code") !== 0 || sub.cellKey(1, "code") !== 1) {
+    console.error(`FAIL: cellKey data/bracket = ${sub.cellKey(0, "code")}/${sub.cellKey(1, "code")}, want 0/1`);
+    process.exit(1);
+  }
+  console.log("cell types keep a real data class");
+}

@@ -74,6 +74,8 @@ export class BffSubstrate implements Substrate {
    * in the middle of an epoch and be overwritten (or tear a tape in half).
    */
   private queue: Promise<unknown> = Promise.resolve();
+  /** bumped on every thread choice, so a queued downgrade cannot outlive it */
+  private threadGen = 0;
 
   constructor(soup: Soup, pool: PairPool | null, spawn: ((n: number) => PairPool | null) | null = null) {
     this.soup = soup;
@@ -131,6 +133,7 @@ export class BffSubstrate implements Substrate {
     return this.runExclusive(() => this.soup.paint(c, b));
   }
   dispose() {
+    this.threadGen++;
     this.pool?.dispose();
     this.pool = null;
   }
@@ -144,12 +147,16 @@ export class BffSubstrate implements Substrate {
       // Don't terminate workers in the middle of an epoch: that would leave
       // half its pairs written while the epoch is dropped and planned again.
       // The pool stays until the in-flight step has recorded its epoch.
+      const gen = ++this.threadGen;
       void this.runExclusive(() => {
+        // a newer choice (for example back to 4 threads) wins over this teardown
+        if (gen !== this.threadGen) return;
         pool.dispose();
         if (this.pool === pool) this.pool = null;
       });
       return "单线程（正在切换）";
     }
+    this.threadGen++;
     if (this.pool) return this.pool.setThreads(n);
     if (!this.spawn) return "这个页面拿不到 SharedArrayBuffer，只能用单线程";
     try {
@@ -214,8 +221,10 @@ export class BffSubstrate implements Substrate {
     }
     const counts = new Uint8Array(5);
     for (let i = 0; i < TAPE; i++) counts[BYTE_CLASS[this.soup.progs[off + i]]]++;
-    let best = 1;
-    for (let k = 2; k < 5; k++) if (counts[k] > counts[best]) best = k;
+    // class 0 is "data" and must be allowed to win: starting at 1 made every
+    // data-dominated cell look like a bracket cell
+    let best = 0;
+    for (let k = 1; k < 5; k++) if (counts[k] > counts[best]) best = k;
     return best;
   }
 

@@ -47,7 +47,21 @@ export class Pool {
   setThreads(n: number): string {
     const cores = Math.max(1, Math.min(8, n | 0));
     if (this.degraded) return "并行已失效，重置后恢复";
-    if (cores === this.workers.length) return this.info.reason;
+    if (cores === this.workers.length) {
+      // selecting the current count cancels a switch that was queued for the
+      // end of this epoch, or the old target would still win
+      this.respawnAfter = null;
+      if (this.respawnTimer) {
+        clearTimeout(this.respawnTimer);
+        this.respawnTimer = 0;
+      }
+      this.pendingCores = cores;
+      if (this.threadTimer) {
+        clearTimeout(this.threadTimer);
+        this.threadTimer = 0;
+      }
+      return this.info.reason;
+    }
     this.pendingCores = cores;
     if (this.threadTimer) clearTimeout(this.threadTimer);
     this.threadTimer = setTimeout(() => {

@@ -117,37 +117,69 @@ for (const [b, next, want] of [[0xed, 0xb0, "≫"], [0xed, 0xb8, "≪"], [0xed, 
     process.exit(1);
   }
 }
-for (const [b, len] of [
-  [0x00, 1], [0x3e, 2], [0x01, 3], [0x2a, 3], // NOP / LD A,n / LD BC,nn / LD HL,(nn)
-  [0x18, 2], [0x20, 2], [0x10, 2],             // JR e / JR NZ,e / DJNZ e
-  [0xd3, 2], [0xdb, 2],                        // OUT (n),A / IN A,(n)
-  [0xcb, 2], [0x76, 1],
+for (const [b, next, len] of [
+  [0x00, 0, 1], [0x3e, 0, 2], [0x01, 0, 3], [0x2a, 0, 3], // NOP / LD A,n / LD BC,nn / LD HL,(nn)
+  [0x18, 0, 2], [0x20, 0, 2], [0x10, 0, 2],             // JR e / JR NZ,e / DJNZ e
+  [0xd3, 0, 2], [0xdb, 0, 2],                           // OUT (n),A / IN A,(n)
+  [0xcb, 0x00, 2], [0x76, 0, 1],
+  // DD/FD take an extra byte whenever the unprefixed form touches (HL)
+  [0xdd, 0x21, 4], [0xdd, 0x36, 4], [0xdd, 0x7e, 3], [0xdd, 0x46, 3],
+  [0xdd, 0x34, 3], [0xdd, 0x09, 2], [0xdd, 0xe5, 2], [0xdd, 0xe9, 2],
+  [0xfd, 0x21, 4], [0xfd, 0x36, 4], [0xfd, 0x7e, 3],
+  [0xdd, 0xcb, 4],
+  [0xdd, 0xdd, 2], [0xdd, 0xed, 2], // prefix runs stay one prefix wide
+  [0xed, 0xb0, 2], [0xed, 0x43, 4], [0xed, 0x7b, 4],
 ] as const) {
-  if (instrLen(b) !== len) {
-    console.error(`FAIL: instrLen(0x${b.toString(16)}) = ${instrLen(b)}, want ${len}`);
+  if (instrLen(b, next) !== len) {
+    console.error(`FAIL: instrLen(0x${b.toString(16)},0x${next.toString(16)}) = ${instrLen(b, next)}, want ${len}`);
     process.exit(1);
   }
+}
+
+// the listing and the mnemonic blocks must step over DD/FD operands, not print
+// them as separate instructions
+{
+  const s3 = new Z80Substrate(soup);
+  const dd = new Uint8Array(16);
+  dd.set([0xdd, 0x21, 0x34, 0x12, 0xdd, 0x7e, 0x05]);
+  soup.paint(0, dd);
+  const blocks = s3.blocks(0);
+  if (blocks[0]?.len !== 4 || blocks[1]?.len !== 3 || blocks[2]?.start !== 7) {
+    console.error(`FAIL: DD blocks = ${blocks.map((b) => `${b.start}+${b.len}`).join(" ")}`);
+    process.exit(1);
+  }
+  const listed = s3.listing(0);
+  if (listed[0]?.offset !== 0 || listed[1]?.offset !== 4 || listed[2]?.offset !== 7) {
+    console.error(`FAIL: DD listing offsets = ${listed.map((l) => l.offset).join(" ")}`);
+    process.exit(1);
+  }
+  console.log("DD/FD instructions keep their operand bytes in one block");
 }
 
 // every byte of every cell must be covered by exactly one block, in reading order
 {
   const s2 = new Z80Substrate(soup);
-  const seen = new Uint8Array(s2.n * 16);
   let blocks = 0;
   for (let c = 0; c < s2.n; c++) {
+    let at = 0;
     for (const b of s2.blocks(c)) {
       blocks++;
-      if (b.len < 1 || b.start + b.len > 16) {
-        console.error(`FAIL: block at cell ${c} byte ${b.start} len ${b.len}`);
+      if (b.len < 1 || b.start !== at || b.start + b.len > 16) {
+        console.error(`FAIL: block at cell ${c} byte ${b.start} len ${b.len}, expected ${at}`);
         process.exit(1);
       }
+      at += b.len;
+    }
+    if (at !== 16) {
+      console.error(`FAIL: cell ${c} blocks cover ${at}/16 bytes`);
+      process.exit(1);
     }
   }
   if (blocks < s2.n) {
     console.error(`FAIL: only ${blocks} blocks for ${s2.n} cells`);
     process.exit(1);
   }
-  console.log(`mnemonic blocks: ${blocks} across ${s2.n} cells (${seen.length} bytes)`);
+  console.log(`mnemonic blocks: ${blocks} across ${s2.n} cells (${s2.n * 16} bytes)`);
 }
 
 const sub = new Z80Substrate(soup);

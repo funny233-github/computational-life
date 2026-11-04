@@ -15,14 +15,44 @@ import { Z80World } from "./z80soup.ts";
 import { BYTE2ASM, ED_NAME } from "./z80disasm.ts";
 import { describe } from "./z80desc.ts";
 
-/** how many bytes the instruction starting at `b` occupies */
-export function instrLen(b: number): number {
+/** bytes an unprefixed opcode occupies, derived from its disassembly text */
+const BASE_LEN = new Uint8Array(256);
+for (let b = 0; b < 256; b++) {
   const name = BYTE2ASM[b];
-  if (b === 0xcb || b === 0xed || b === 0xdd || b === 0xfd) return 2;
-  if (/nn/.test(name)) return 3;
+  if (b === 0xcb) BASE_LEN[b] = 2; // CB + opcode
+  else if (b === 0xdd || b === 0xed || b === 0xfd) BASE_LEN[b] = 2; // prefix + opcode
+  else if (/nn/.test(name)) BASE_LEN[b] = 3;
   // 8-bit immediates, displacements and relative jumps all eat one more byte
-  if (/(,n|,d|,e)\b/.test(name) || / e$/.test(name) || /\([nd]\)/.test(name)) return 2;
-  return 1;
+  else if (/(,n|,d|,e)\b/.test(name) || / e$/.test(name) || /\([nd]\)/.test(name)) BASE_LEN[b] = 2;
+  else BASE_LEN[b] = 1;
+}
+
+/**
+ * How many bytes the instruction starting at `b` occupies.
+ *
+ * `next` is the byte after the opcode. It is only needed for prefixes: a DD/FD
+ * instruction is one byte longer than its unprefixed form when that form touches
+ * `(HL)`, because `(HL)` becomes `(IX+d)` / `(IY+d)` and grows a displacement.
+ */
+export function instrLen(b: number, next?: number): number {
+  if (b === 0xdd || b === 0xfd) {
+    if (next === undefined) return 2;
+    if (next === 0xcb) return 4; // DD CB d op
+    // a run of prefixes is its own (rare) case; do not swallow the byte after
+    // the second prefix as if it were an operand
+    if (next === 0xdd || next === 0xfd || next === 0xed) return 2;
+    const name = BYTE2ASM[next] ?? "";
+    const displacement = name.includes("(HL)") && name !== "JP (HL)";
+    return 1 + BASE_LEN[next] + (displacement ? 1 : 0);
+  }
+  if (b === 0xed) {
+    // LD (nn),rr / LD rr,(nn) are the only ED forms with two operand bytes;
+    // everything else in the ED space is prefix + opcode
+    if (next === 0x43 || next === 0x4b || next === 0x53 || next === 0x5b ||
+        next === 0x63 || next === 0x6b || next === 0x73 || next === 0x7b) return 4;
+    return 2;
+  }
+  return BASE_LEN[b];
 }
 
 /** one-line label for a whole instruction, ED-prefixed forms included */
@@ -221,6 +251,8 @@ export class Z80Substrate implements Substrate {
   private scopeCore: Z80Core | null;
   /** serialises step/reset/paint so a user write cannot land mid-epoch */
   private queue: Promise<unknown> = Promise.resolve();
+  /** bumped on every thread choice, so a queued downgrade cannot outlive it */
+  private threadGen = 0;
 
   constructor(
     z: Z80World,
@@ -264,6 +296,7 @@ export class Z80Substrate implements Substrate {
     });
   }
   dispose() {
+    this.threadGen++;
     this.pool?.dispose();
     this.pool = null;
   }
@@ -275,12 +308,16 @@ export class Z80Substrate implements Substrate {
       const pool = this.pool;
       if (!pool) return "单线程（配对在主线程上跑）";
       // same rule as BFF: let the current epoch finish before the teardown
+      const gen = ++this.threadGen;
       void this.runExclusive(() => {
+        // a newer choice wins over this teardown
+        if (gen !== this.threadGen) return;
         pool.dispose();
         if (this.pool === pool) this.pool = null;
       });
       return "单线程（正在切换）";
     }
+    this.threadGen++;
     if (this.pool) return this.pool.setThreads(n);
     if (!this.spawn) return "这个页面拿不到 SharedArrayBuffer，只能用单线程";
     try {
@@ -345,7 +382,7 @@ export class Z80Substrate implements Substrate {
     let i = 0;
     while (i < bytes.length) {
       const b = bytes[i];
-      const len = Math.min(instrLen(b), bytes.length - i);
+      const len = Math.min(instrLen(b, bytes[i + 1]), bytes.length - i);
       // the two-byte ED prefix carries the block instructions
       const text = asmText(b, bytes[i + 1]);
       out.push({ offset: i, value: b, text: len > 1 ? `${text} (${len} 字节)` : text });
@@ -360,7 +397,7 @@ export class Z80Substrate implements Substrate {
     let i = 0;
     while (i < CELL) {
       const b = bytes[i];
-      const len = Math.min(instrLen(b), CELL - i);
+      const len = Math.min(instrLen(b, bytes[i + 1]), CELL - i);
       out.push({ start: i, len, short: shortAsm(b, bytes[i + 1]) });
       i += len;
     }
