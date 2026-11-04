@@ -232,3 +232,28 @@ for (const px of [1, 2, 4, 8]) {
   }
 }
 console.log("byte view: 1/2/4/8 px per byte all render as exact squares");
+
+// the full-map 1:1 fast path for a 4×4 cell: cell-major bytes must land at
+// (cx*4, cy*4), not be laid out as one long row
+{
+  const sw = soup.w * 4;
+  const sh = soup.h * 4;
+  const o = new Uint32Array(sw * sh);
+  drawWindowBytes(soup.soup, soup.w, soup.h, 4, 1, 0, 0, sw, sh, Z80_COLOR, 0xff000000, false, 0, 0, o);
+  let bad = 0;
+  for (let cy = 0; cy < soup.h; cy++) {
+    for (let cx = 0; cx < soup.w; cx++) {
+      const base = (cy * soup.w + cx) * 16;
+      for (let b = 0; b < 16; b++) {
+        const x = cx * 4 + (b % 4);
+        const y = cy * 4 + ((b / 4) | 0);
+        if (o[y * sw + x] !== Z80_COLOR[soup.soup[base + b]]) bad++;
+      }
+    }
+  }
+  if (bad) {
+    console.error(`FAIL: z80 full-map fast path has ${bad} misplaced pixels`);
+    process.exit(1);
+  }
+  console.log("z80 full-map 1:1 fast path: cell-major bytes land in their 4×4 block");
+}

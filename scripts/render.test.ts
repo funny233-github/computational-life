@@ -75,3 +75,38 @@ if (moved / total < 0.98) {
   process.exit(1);
 }
 console.log(`panning: one cell shifts the bitmap by exactly ${cell} px (${((moved / total) * 100).toFixed(1)}% match)`);
+
+// 4. the full-map 1:1 copy (the main view's hot path) is exact
+{
+  const sw = soup.w * 8;
+  const sh = soup.h * 8;
+  const full = new Uint32Array(sw * sh);
+  drawWindowBytes(soup.progs, soup.w, soup.h, 8, 1, 0, 0, sw, sh, BYTE_COLOR, 0xff000000, false, 0, 0, full);
+  let bad = 0;
+  // the byte array is cell-major: cell 0's 8×8 block comes first, then cell 1's.
+  // The fast path must place each block at (cx*8, cy*8), not lay the bytes out
+  // as one long row (that was the "whole map looks squashed" bug).
+  for (let cy = 0; cy < soup.h; cy++) {
+    for (let cx = 0; cx < soup.w; cx++) {
+      const base = (cy * soup.w + cx) * 64;
+      for (let b = 0; b < 64; b++) {
+        const x = cx * 8 + (b % 8);
+        const y = cy * 8 + ((b / 8) | 0);
+        if (full[y * sw + x] !== BYTE_COLOR[soup.progs[base + b]]) bad++;
+      }
+    }
+  }
+  if (bad) {
+    console.error(`FAIL: full-map byte copy has ${bad} wrong pixels`);
+    process.exit(1);
+  }
+  const cells = new Uint32Array(soup.w * soup.h);
+  drawWindowCells(soup.w, soup.h, 1, 0, 0, soup.w, soup.h, (c) => cellColor(sub, c, "code"), 0xff000000, 0, 0, cells);
+  let badCells = 0;
+  for (let i = 0; i < cells.length; i++) if (cells[i] !== (cellColor(sub, i, "code") >>> 0)) badCells++;
+  if (badCells) {
+    console.error(`FAIL: full-map cell copy has ${badCells} wrong pixels`);
+    process.exit(1);
+  }
+  console.log("full-map 1:1 raster: byte and cell fast paths are exact");
+}

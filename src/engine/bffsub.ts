@@ -11,7 +11,7 @@ import type {
   Stat,
   Substrate,
 } from "./substrate.ts";
-import type { Soup } from "./soup.ts";
+import type { Soup, Stats } from "./soup.ts";
 
 class TapeMicroscope implements Microscope {
   private a: Uint8Array;
@@ -76,6 +76,11 @@ export class BffSubstrate implements Substrate {
   private queue: Promise<unknown> = Promise.resolve();
   /** bumped on every thread choice, so a queued downgrade cannot outlive it */
   private threadGen = 0;
+  /** reused by cellKey("code"): one small allocation per cell showed up in profiles */
+  private classCounts = new Uint8Array(5);
+  /** stats() and chart() ask for the same epoch; the scan is not free */
+  private statsCache: { epoch: number; rev: number; value: Stats } | null = null;
+  private statsRev = 0;
 
   constructor(soup: Soup, pool: PairPool | null, spawn: ((n: number) => PairPool | null) | null = null) {
     this.soup = soup;
@@ -121,7 +126,11 @@ export class BffSubstrate implements Substrate {
     this.soup.step();
   }
   reset(seed?: number): Promise<void> {
-    return this.runExclusive(() => this.soup.reset(seed));
+    return this.runExclusive(() => {
+      this.soup.reset(seed);
+      this.statsRev++; // the sample is no longer about these bytes
+      this.statsCache = null;
+    });
   }
   bytes() {
     return this.soup.progs;
@@ -130,7 +139,11 @@ export class BffSubstrate implements Substrate {
     return this.soup.cellBytes(c);
   }
   paint(c: number, b: Uint8Array): Promise<void> {
-    return this.runExclusive(() => this.soup.paint(c, b));
+    return this.runExclusive(() => {
+      this.soup.paint(c, b);
+      this.statsRev++;
+      this.statsCache = null;
+    });
   }
   dispose() {
     this.threadGen++;
@@ -180,8 +193,18 @@ export class BffSubstrate implements Substrate {
     if (o.density !== undefined) this.soup.density = o.density;
   }
 
+  private sampleStats(): Stats {
+    const epoch = this.soup.epoch;
+    if (this.statsCache?.epoch === epoch && this.statsCache.rev === this.statsRev) {
+      return this.statsCache.value;
+    }
+    const value = this.soup.stats(4096);
+    this.statsCache = { epoch, rev: this.statsRev, value };
+    return value;
+  }
+
   stats(): Stat[] {
-    const s = this.soup.stats(4096);
+    const s = this.sampleStats();
     return [
       { label: "血统", value: (s.top1 * 100).toFixed(1) + "%", hint: "最大血统占比" },
       { label: "多样性", value: String(s.distinct), hint: "不同的程序数" },
@@ -190,7 +213,7 @@ export class BffSubstrate implements Substrate {
     ];
   }
   chart(): ChartPoint {
-    const s = this.soup.stats(4096);
+    const s = this.sampleStats();
     return { primary: s.top1, secondary: Math.min(1, s.distinct / Math.max(1, this.n)) };
   }
   chartLabels(): [string, string] {
@@ -219,7 +242,8 @@ export class BffSubstrate implements Substrate {
       for (let i = 0; i < TAPE; i++) h = Math.imul(h ^ this.soup.progs[off + i], 0x01000193);
       return (h >>> 24) & 0xff;
     }
-    const counts = new Uint8Array(5);
+    const counts = this.classCounts;
+    counts.fill(0);
     for (let i = 0; i < TAPE; i++) counts[BYTE_CLASS[this.soup.progs[off + i]]]++;
     // class 0 is "data" and must be allowed to win: starting at 1 made every
     // data-dominated cell look like a bracket cell

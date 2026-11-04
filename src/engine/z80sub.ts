@@ -253,6 +253,11 @@ export class Z80Substrate implements Substrate {
   private queue: Promise<unknown> = Promise.resolve();
   /** bumped on every thread choice, so a queued downgrade cannot outlive it */
   private threadGen = 0;
+  /** reused by cellKey("code"): one small allocation per cell showed up in profiles */
+  private classCounts = new Uint8Array(5);
+  /** stats() and chart() ask for the same epoch; the scan is O(bytes) */
+  private statsCache: { epoch: number; rev: number; value: ReturnType<Z80World["stats"]> } | null = null;
+  private statsRev = 0;
 
   constructor(
     z: Z80World,
@@ -336,7 +341,11 @@ export class Z80Substrate implements Substrate {
     this.z.step();
   }
   reset(seed?: number): Promise<void> {
-    return this.runExclusive(() => this.z.reset(seed));
+    return this.runExclusive(() => {
+      this.z.reset(seed);
+      this.statsRev++;
+      this.statsCache = null;
+    });
   }
   bytes() {
     return this.z.soup;
@@ -345,7 +354,11 @@ export class Z80Substrate implements Substrate {
     return this.z.cellBytes(c);
   }
   paint(c: number, b: Uint8Array): Promise<void> {
-    return this.runExclusive(() => this.z.paint(c, b));
+    return this.runExclusive(() => {
+      this.z.paint(c, b);
+      this.statsRev++;
+      this.statsCache = null;
+    });
   }
   configure(o: { noise?: number; steps?: number; radius?: number; mixed?: boolean; density?: number }) {
     // Z80 has no radius/density/mixed knobs in the reference; they are hidden
@@ -354,8 +367,18 @@ export class Z80Substrate implements Substrate {
     if (o.steps !== undefined) this.z.steps = o.steps;
   }
 
+  private sampleStats(): ReturnType<Z80World["stats"]> {
+    const epoch = this.z.epoch;
+    if (this.statsCache?.epoch === epoch && this.statsCache.rev === this.statsRev) {
+      return this.statsCache.value;
+    }
+    const value = this.z.stats();
+    this.statsCache = { epoch, rev: this.statsRev, value };
+    return value;
+  }
+
   stats(): Stat[] {
-    const s = this.z.stats();
+    const s = this.sampleStats();
     const writes = this.z.writes.reduce((a, b) => a + b, 0);
     return [
       { label: "熵", value: s.entropy.toFixed(2), hint: "比特 / 字节" },
@@ -369,7 +392,7 @@ export class Z80Substrate implements Substrate {
     ];
   }
   chart(): ChartPoint {
-    const s = this.z.stats();
+    const s = this.sampleStats();
     return { primary: s.topShare, secondary: s.entropy / 8 };
   }
   chartLabels(): [string, string] {
@@ -419,7 +442,8 @@ export class Z80Substrate implements Substrate {
     if (mode === "lineage") {
       return (Math.imul(b[0] + (b[1] << 8), 2654435761) >>> 26) & 0x3f;
     }
-    const counts = new Uint8Array(5);
+    const counts = this.classCounts;
+    counts.fill(0);
     for (let i = 0; i < CELL; i++) counts[Z80_CLASS[b[i]]]++;
     let best = 0;
     for (let k = 1; k < 5; k++) if (counts[k] > counts[best]) best = k;

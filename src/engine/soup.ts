@@ -113,6 +113,9 @@ export class Soup {
   private nextTok = 1;
   private cdfM = new Float64Array(IV);
   private cdfC = new Float64Array(IV);
+  /** planning scratch, reused every epoch (32k cells at 240×135) */
+  private orderBuf: Int32Array;
+  private takenBuf: Uint8Array;
 
   constructor(o: SoupOptions) {
     this.w = o.w;
@@ -133,6 +136,8 @@ export class Soup {
       this.progs = new Uint8Array(bytes);
       this.toks = new Uint32Array(this.n * TAPE);
     }
+    this.orderBuf = new Int32Array(this.n);
+    this.takenBuf = new Uint8Array(this.n);
     this.buildCdfs();
     if (!o.skipReset) this.reset(o.seed);
   }
@@ -227,7 +232,9 @@ export class Soup {
   planInto(pairs: Int32Array, leftoverOut: Int32Array): { np: number; nl: number } {
     const { n, w, h, radius, mixed } = this;
     const rand = rng(streamSeed(this.seed, this.epoch, 0x51ed));
-    const order = new Int32Array(n);
+    const order = this.orderBuf;
+    const taken = this.takenBuf;
+    taken.fill(0);
     for (let i = 0; i < n; i++) order[i] = i;
     for (let i = n - 1; i > 0; i--) {
       const j = (rand() * (i + 1)) | 0;
@@ -236,7 +243,6 @@ export class Soup {
       order[j] = t;
     }
 
-    const taken = new Uint8Array(n);
     let np = 0;
 
     if (mixed) {

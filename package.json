@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "typecheck:tests": "tsc -p tsconfig.tests.json --noEmit",
     "sim": "node scripts/sim.ts",
+    "bench": "node scripts/bench.ts",
     "test": "npm run build && node scripts/layers.test.ts && node scripts/bff.test.ts && node scripts/epoch.test.ts && node scripts/race.test.ts && node scripts/z80.test.ts && node scripts/z80par.test.ts && node scripts/par.test.ts && node scripts/render.test.ts && node scripts/zoom.test.ts && node scripts/insight.test.ts && node scripts/smoke.mjs",
     "play": "npm run build && node scripts/serve.mjs"
   },

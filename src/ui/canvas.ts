@@ -22,9 +22,36 @@ export function drawWindowBytes(
   offY: number,
   out: Uint32Array,
 ) {
-  out.fill(bg);
   const cell = side * px;
   const perCell = side * side;
+  // The main view always asks for the whole soup at exactly one source pixel
+  // per byte. That case can skip the per-byte rounding and clipping, but the
+  // bytes are stored cell-major (8×8 or 4×4 blocks), not in raster order, so
+  // the copy has to walk each cell's rows into their place in the bitmap.
+  if (
+    px === 1 &&
+    camX === 0 &&
+    camY === 0 &&
+    offX === 0 &&
+    offY === 0 &&
+    !cellLines &&
+    outW === soupW * side &&
+    outH === soupH * side
+  ) {
+    for (let cy = 0; cy < soupH; cy++) {
+      for (let cx = 0; cx < soupW; cx++) {
+        const src = (cy * soupW + cx) * perCell;
+        const dst = cy * side * outW + cx * side;
+        for (let by = 0; by < side; by++) {
+          let s = src + by * side;
+          let d = dst + by * outW;
+          for (let bx = 0; bx < side; bx++) out[d + bx] = colors[bytes[s + bx]];
+        }
+      }
+    }
+    return;
+  }
+  out.fill(bg);
   const cols = Math.ceil(outW / cell) + 1;
   const rows = Math.ceil(outH / cell) + 1;
   for (let ry = 0; ry < rows; ry++) {
@@ -89,6 +116,20 @@ export function drawWindowCells(
   offY: number,
   out: Uint32Array,
 ) {
+  // the one-pixel-per-cell views cover the whole soup, so the grid arithmetic
+  // collapses to one lookup per cell (no rounding, no background fill)
+  if (
+    cell === 1 &&
+    camX === 0 &&
+    camY === 0 &&
+    offX === 0 &&
+    offY === 0 &&
+    outW === soupW &&
+    outH === soupH
+  ) {
+    for (let i = 0, len = outW * outH; i < len; i++) out[i] = colorOf(i);
+    return;
+  }
   out.fill(bg);
   const cols = Math.ceil(outW / cell) + 1;
   const rows = Math.ceil(outH / cell) + 1;
@@ -212,6 +253,19 @@ export class SoupCanvas {
   panning = false;
   /** ?debug: how many times draw() ran, for the browser probes */
   draws = 0;
+  /** monospace width per (text, size): the same mnemonic repeats across cells */
+  private glyphWidths = new Map<string, number>();
+
+  private textWidth(text: string, fs: number): number {
+    const key = `${fs}\u0000${text}`;
+    let w = this.glyphWidths.get(key);
+    if (w === undefined) {
+      this.ctx.font = `500 ${fs}px ${MONO}`;
+      w = this.ctx.measureText(text).width;
+      this.glyphWidths.set(key, w);
+    }
+    return w;
+  }
 
   private drawMnemonics(
     sub: {
@@ -256,13 +310,12 @@ export class SoupCanvas {
           let fs = Math.min(26, Math.round(px * 0.84));
           let textRight = 0;
           if (text && fs >= 10 && avail > 8) {
-            // measure once, then scale the size so the whole mnemonic fits
-            ctx.font = `500 ${fs}px ${MONO}`;
-            const w = ctx.measureText(text).width;
+            // measure once (cached), then scale the size so the whole
+            // mnemonic fits; the same strings repeat across thousands of cells
+            const w = this.textWidth(text, fs);
             if (w > avail) fs = Math.floor((fs * avail) / w / 0.97);
             if (fs >= 10) {
-              ctx.font = `500 ${fs}px ${MONO}`;
-              textRight = gx2 + 2 + ctx.measureText(text).width;
+              textRight = gx2 + 2 + this.textWidth(text, fs);
               draw.push([text, gx2 + 2, gy2 + px / 2, fs, c, blk.start]);
             }
           }
